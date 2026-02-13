@@ -175,48 +175,6 @@ const INITIAL_DATA = {
       ctaText: 'Solicitar Design'
     }
   ],
-  posts: [
-    {
-      id: '1',
-      title: 'Venda 24h por dia: O Poder da Automação no WhatsApp',
-      slug: 'venda-24h-automacao-whatsapp',
-      excerpt: 'Descubra como o Zap Marketing pode transformar seu atendimento e triplicar suas vendas sem você tocar no celular.',
-      content: 'Você já perdeu uma venda porque demorou para responder um cliente? Isso é mais comum do que parece. No mundo digital, a velocidade é tudo.\n\nCom nossa ferramenta de **Zap Marketing**, você configura um "Atendente Virtual" que trabalha por você 24 horas por dia, 7 dias por semana. Ele responde dúvidas, envia catálogos e até fecha pedidos enquanto você dorme.\n\nAlém disso, o disparo em massa permite que você alcance milhares de clientes antigos com uma única promoção, reaquecendo leads e gerando caixa imediato. Não seja refém do atendimento manual.',
-      coverImage: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&q=80&w=1200',
-      published: true,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: '2',
-      title: 'Site Institucional vs Landing Page: Onde anunciar?',
-      slug: 'site-institucional-vs-landing-page',
-      excerpt: 'Se você faz tráfego pago (Ads) e joga o cliente na home do seu site, você está jogando dinheiro fora.',
-      content: 'Um erro clássico de quem começa a anunciar no Google ou Facebook é direcionar o cliente para a página inicial (Home) do site. O cliente chega lá, vê "Quem Somos", "Missão", "Blog"... e se perde.\n\nUma **Landing Page de Alta Conversão** tem UM único objetivo: VENDER. Ela não tem menu, não tem distrações e guia o visitante por uma jornada persuasiva até o botão de compra.\n\nNossos testes mostram que Landing Pages convertem até 5x mais que sites comuns. Se você quer ROI (Retorno sobre Investimento), pare de usar sites institucionais para vendas.',
-      coverImage: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=1200',
-      published: true,
-      createdAt: new Date().toISOString()
-    },
-    {
-        id: '3',
-        title: 'O Fim da TV a Cabo? Conheça a Revolução do Streaming 4K',
-        slug: 'fim-da-tv-a-cabo-revolucao-streaming',
-        excerpt: 'Por que pagar R$ 300,00 em pacotes limitados quando você pode ter tudo via internet por uma fração do preço?',
-        content: 'O modelo tradicional de TV por assinatura está em colapso. Mensalidades caras, fidelidade abusiva, aparelhos lentos e chuva que derruba o sinal.\n\nA solução **TV Cine Box 4K** da To-Ligado muda esse jogo. Utilizando apenas sua conexão de internet (IPTV/P2P), entregamos mais de 2.000 canais ao vivo (incluindo Premiere, Combate, HBO) e uma biblioteca com mais de 10.000 filmes e séries (Netflix, Prime, Disney+ tudo incluso).\n\nVocê paga um valor simbólico mensal, sem fidelidade, e assiste na sua TV Smart, no celular ou no computador. É a liberdade que você esperava.',
-        coverImage: 'https://images.unsplash.com/photo-1593784653277-226e3c6a4696?auto=format&fit=crop&q=80&w=1200',
-        published: true,
-        createdAt: new Date().toISOString()
-    },
-    {
-        id: '4',
-        title: 'Conteúdo Infinito: Como a IA pode manter seu Blog atualizado',
-        slug: 'conteudo-infinito-ia-blog',
-        excerpt: 'O Google ama conteúdo novo. Mas quem tem tempo de escrever todo dia? Conheça nossa solução de Blogs Automáticos.',
-        content: 'Para aparecer na primeira página do Google, você precisa de SEO (Otimização para Mecanismos de Busca). E o pilar do SEO é conteúdo relevante e frequente.\n\nO problema é que contratar redatores é caro e escrever consome tempo. Nossa solução de **Blogs Automáticos com IA** resolve isso. Configuramos robôs inteligentes que pesquisam tendências no seu nicho, escrevem artigos completos, geram imagens exclusivas e postam no seu site automaticamente.\n\nVocê ganha autoridade, atrai tráfego orgânico (gratuito) e foca apenas em atender os clientes que chegam.',
-        coverImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=1200',
-        published: true,
-        createdAt: new Date().toISOString()
-    }
-  ],
   leads: [],
   orders: []
 };
@@ -290,9 +248,15 @@ const sendEvolutionMessage = async (to, text) => {
         return false;
     }
 
+    const apiKey = (config.apiKey || '').trim();
+    const instanceName = (config.instanceName || '').trim();
+    const baseUrl = (config.baseUrl || '').replace(/\/$/, '');
+
     // Clean number (keep only digits)
     const number = to.replace(/\D/g, '');
-    const url = `${config.baseUrl}/message/sendText/${config.instanceName}`;
+    const url = `${baseUrl}/message/sendText/${instanceName}`;
+
+    console.log(`Attempting to send message via Evolution API to ${number}...`);
 
     try {
         const body = {
@@ -306,7 +270,7 @@ const sendEvolutionMessage = async (to, text) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': config.apiKey // Evolution v2 uses 'apikey' header with instance token
+                'apikey': apiKey // Standard Evolution v2 Instance Header
             },
             body: JSON.stringify(body)
         });
@@ -519,23 +483,29 @@ app.get('/api/evolution/status', async (req, res) => {
     }
 
     try {
-        const url = `${config.baseUrl}/instance/connectionState/${config.instanceName}`;
+        const apiKey = (config.apiKey || '').trim();
+        const instanceName = (config.instanceName || '').trim();
+        const baseUrl = (config.baseUrl || '').replace(/\/$/, '');
+        
+        const url = `${baseUrl}/instance/connectionState/${instanceName}`;
+        console.log(`Checking status at: ${url}`);
+
         const response = await fetch(url, {
-            headers: { 'apikey': config.apiKey }
+            headers: { 'apikey': apiKey }
         });
         
         if (response.ok) {
             const data = await response.json();
-            // Expected: { instance: { state: "open" } } or { instance: "name", state: "open" } depending on version
-            // Adapting for generic response check
             const state = data?.instance?.state || data?.state || 'unknown';
-            res.json({ status: state });
+            res.json({ status: state, raw: data });
         } else {
-            res.json({ status: 'error', details: await response.text() });
+            const errorText = await response.text();
+            console.error("Evolution Status Error:", errorText);
+            res.json({ status: 'error', details: errorText, code: response.status });
         }
     } catch (e) {
         console.error("Evolution Status Check Failed", e);
-        res.json({ status: 'error' });
+        res.json({ status: 'error', details: e.message });
     }
 });
 

@@ -36,6 +36,7 @@ export const AdminDashboard: React.FC = () => {
   
   // Connection Status State
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'open' | 'close' | 'error' | null>(null);
+  const [connectionError, setConnectionError] = useState<string>('');
 
   // Editing States
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -224,11 +225,22 @@ export const AdminDashboard: React.FC = () => {
   
   const handleCheckConnection = async () => {
       setConnectionStatus('checking');
-      const status = await db.checkEvolutionStatus();
+      setConnectionError('');
+      
+      const result = await db.checkEvolutionStatus();
+      const status = result.status;
+      
       // Evolution standard 'open' means connected
-      if (status === 'open') setConnectionStatus('open');
-      else if (status === 'close') setConnectionStatus('close');
-      else setConnectionStatus('error');
+      if (status === 'open') {
+        setConnectionStatus('open');
+      }
+      else if (status === 'close') {
+        setConnectionStatus('close');
+      }
+      else {
+        setConnectionStatus('error');
+        setConnectionError(result.details || 'Erro desconhecido');
+      }
   };
 
   const handleTestEvolution = async () => {
@@ -241,7 +253,7 @@ export const AdminDashboard: React.FC = () => {
       setTestSending(false);
       
       if (success) alert("Mensagem de teste enviada com sucesso! Verifique o WhatsApp.");
-      else alert("Falha ao enviar. Verifique a URL, Instância e Token da API.");
+      else alert("Falha ao enviar. Verifique se a instância está conectada e se a API Key da Instância está correta.");
   };
 
   // --- Formatters ---
@@ -652,6 +664,12 @@ export const AdminDashboard: React.FC = () => {
             )}
          </div>
          
+         {connectionError && (
+            <div className="bg-red-900/40 border border-red-500/30 text-red-300 p-3 rounded-lg text-xs break-all">
+                <strong>Erro de Conexão:</strong> {connectionError}
+            </div>
+         )}
+         
          <div className="flex items-center gap-4 mb-4">
             <label className="text-sm text-gray-300 font-bold">Status:</label>
             <button 
@@ -690,7 +708,7 @@ export const AdminDashboard: React.FC = () => {
                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
                placeholder="Token da Instância"
              />
-             <p className="text-[10px] text-gray-500 mt-1">Use a API Key específica da Instância, não a Global.</p>
+             <p className="text-[10px] text-gray-500 mt-1">Use a API Key específica da Instância (Header 'apikey').</p>
            </div>
            
            <div className="flex gap-4">

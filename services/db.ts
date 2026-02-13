@@ -357,16 +357,13 @@ export const db = {
       }
   },
 
-  checkEvolutionStatus: async (): Promise<string> => {
+  checkEvolutionStatus: async (): Promise<any> => {
       try {
           const res = await fetchWithTimeout(`${BASE_URL}/evolution/status`);
-          if (res.ok) {
-              const data = await res.json();
-              return data.status || 'error';
-          }
-          return 'error';
+          const data = await res.json();
+          return data;
       } catch (e) {
-          return 'error';
+          return { status: 'error', details: e instanceof Error ? e.message : 'Unknown error' };
       }
   },
 

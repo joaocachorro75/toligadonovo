@@ -1,9 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { db } from '../services/db';
 import { BlogPost, SiteConfig } from '../types';
 import { ArrowLeft, Zap } from 'lucide-react';
 import { LeadForm } from '../components/LeadForm';
+import { SiteHeader } from '../components/SiteHeader';
 
 export const BlogPostPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -26,19 +28,7 @@ export const BlogPostPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-cyan-500 selection:text-black font-sans">
-       {/* Nav */}
-       <nav className="fixed w-full z-50 py-4 px-4 bg-black/80 backdrop-blur border-b border-gray-800">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <Link to="/dicas" className="flex items-center gap-2 text-white/80 hover:text-white transition-colors group">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium text-sm">Voltar para Dicas</span>
-          </Link>
-           <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-cyan-500" />
-                <span className="font-bold tracking-tight">{config.logoText}</span>
-            </div>
-        </div>
-      </nav>
+       <SiteHeader />
 
       <div className="pt-32 pb-20 px-4 max-w-4xl mx-auto">
          <header className="text-center mb-12">

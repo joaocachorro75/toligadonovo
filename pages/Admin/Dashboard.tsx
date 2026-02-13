@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { db } from '../../services/db';
+import { db, normalizePhone } from '../../services/db';
 import { Lead, Product, SiteConfig, Order, BlogPost } from '../../types';
-import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff, AlertTriangle, Download } from 'lucide-react';
+import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff, AlertTriangle, Download, Lock, Eye, EyeOff } from 'lucide-react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ImageUpload } from '../../components/ImageUpload';
 import { INITIAL_SITE_CONFIG } from '../../services/initialData';
@@ -38,6 +38,9 @@ export const AdminDashboard: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'open' | 'close' | 'error' | null>(null);
   const [connectionError, setConnectionError] = useState<string>('');
   const [errorCode, setErrorCode] = useState<number | null>(null);
+
+  // Password Visibility
+  const [showAdminPass, setShowAdminPass] = useState(false);
 
   // Editing States
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -315,7 +318,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // --- Formatters ---
-  const formatPhone = (phone: string) => phone.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4');
+  // NO VISUAL FORMATTING FOR DASHBOARD - RAW DATA PREFERRED FOR API DEBUGGING
   const whatsappLink = (phone: string) => `https://wa.me/${phone.replace(/\+/g, '')}`;
 
   // --- Renders ---
@@ -354,7 +357,7 @@ export const AdminDashboard: React.FC = () => {
             <thead className="bg-gray-900 text-gray-200">
               <tr>
                 <th className="px-6 py-4">Nome</th>
-                <th className="px-6 py-4">WhatsApp</th>
+                <th className="px-6 py-4">WhatsApp (Internacional)</th>
                 <th className="px-6 py-4">Origem</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Ações</th>
@@ -365,8 +368,8 @@ export const AdminDashboard: React.FC = () => {
                 <tr key={lead.id}>
                   <td className="px-6 py-4 font-medium text-white">{lead.name}</td>
                   <td className="px-6 py-4">
-                    <a href={whatsappLink(lead.whatsapp)} target="_blank" className="flex items-center gap-2 text-green-400 hover:text-green-300">
-                      <Phone className="w-4 h-4" /> {formatPhone(lead.whatsapp)}
+                    <a href={whatsappLink(lead.whatsapp)} target="_blank" className="flex items-center gap-2 text-green-400 hover:text-green-300 font-mono tracking-wide">
+                      <Phone className="w-4 h-4" /> {lead.whatsapp}
                     </a>
                   </td>
                   <td className="px-6 py-4">{lead.originPage}</td>
@@ -422,8 +425,8 @@ export const AdminDashboard: React.FC = () => {
                 <tr key={order.id}>
                   <td className="px-6 py-4">
                     <div className="text-white font-medium">{order.customerName}</div>
-                    <a href={whatsappLink(order.customerWhatsapp)} target="_blank" className="text-xs text-green-400 flex items-center gap-1 mt-1">
-                       <Phone className="w-3 h-3" /> {formatPhone(order.customerWhatsapp)}
+                    <a href={whatsappLink(order.customerWhatsapp)} target="_blank" className="text-xs text-green-400 flex items-center gap-1 mt-1 font-mono tracking-wide">
+                       <Phone className="w-3 h-3" /> {order.customerWhatsapp}
                     </a>
                   </td>
                   <td className="px-6 py-4">
@@ -472,6 +475,146 @@ export const AdminDashboard: React.FC = () => {
       </div>
     );
   };
+
+  const renderContent = () => (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl md:text-2xl font-bold text-white">Gestão de Produtos</h2>
+        {!editingProduct && (
+          <button onClick={handleStartCreateProduct} className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base">
+            <Plus className="w-5 h-5" /> <span className="hidden md:inline">Novo Produto</span>
+          </button>
+        )}
+      </div>
+
+      {editingProduct ? (
+        <form onSubmit={handleSaveProduct} className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-6 space-y-6">
+           <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
+            <h3 className="text-xl font-bold text-white">{isCreating ? 'Novo Produto' : 'Editar Produto'}</h3>
+            <button type="button" onClick={() => { setEditingProduct(null); setIsCreating(false); }} className="text-gray-400 hover:text-white">Cancelar</button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="md:col-span-2">
+               <ImageUpload 
+                 label="Imagem Hero (Capa)"
+                 currentImage={editingProduct.heroImage}
+                 onImageChange={(url) => setEditingProduct({ ...editingProduct, heroImage: url })}
+               />
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Título do Produto</label>
+                    <input value={editingProduct.title} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Título no Menu (Curto)</label>
+                    <input value={editingProduct.menuTitle} onChange={e => setEditingProduct({...editingProduct, menuTitle: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Slug (URL)</label>
+                    <input value={editingProduct.slug} onChange={e => setEditingProduct({...editingProduct, slug: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Preço (R$)</label>
+                        <input type="number" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Taxa Adesão (R$)</label>
+                        <input type="number" value={editingProduct.setupFee || 0} onChange={e => setEditingProduct({...editingProduct, setupFee: Number(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+                    </div>
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Tipo de Cobrança</label>
+                    <select value={editingProduct.paymentType} onChange={e => setEditingProduct({...editingProduct, paymentType: e.target.value as any})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white">
+                        <option value="one-time">Pagamento Único</option>
+                        <option value="recurring">Assinatura (Recorrente)</option>
+                    </select>
+                </div>
+                 {editingProduct.paymentType === 'recurring' && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Ciclo</label>
+                        <select value={editingProduct.billingCycle || 'monthly'} onChange={e => setEditingProduct({...editingProduct, billingCycle: e.target.value as any})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white">
+                            <option value="monthly">Mensal</option>
+                            <option value="yearly">Anual</option>
+                        </select>
+                    </div>
+                 )}
+            </div>
+
+            <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-400 mb-1">Descrição Curta</label>
+                <textarea rows={2} value={editingProduct.shortDescription} onChange={e => setEditingProduct({...editingProduct, shortDescription: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+            </div>
+            
+            <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-400 mb-1">Descrição Completa</label>
+                <textarea rows={6} value={editingProduct.fullDescription} onChange={e => setEditingProduct({...editingProduct, fullDescription: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+            </div>
+
+            <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-400 mb-1">Texto do Botão (CTA)</label>
+                <input value={editingProduct.ctaText} onChange={e => setEditingProduct({...editingProduct, ctaText: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+            </div>
+            
+            <div className="md:col-span-2 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Lista de Benefícios (Features)</label>
+                <div className="space-y-2">
+                    {editingProduct.features?.map((feat, index) => (
+                        <div key={index} className="flex gap-2">
+                            <input value={feat} onChange={e => handleFeatureChange(index, e.target.value)} className="flex-1 bg-gray-900 border border-gray-700 rounded p-2 text-white text-sm" placeholder="Ex: Suporte 24h" />
+                            <button type="button" onClick={() => removeFeature(index)} className="p-2 text-red-400 hover:bg-red-900/20 rounded"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                    ))}
+                    <button type="button" onClick={addFeature} className="text-sm text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 mt-2">
+                        <Plus className="w-4 h-4" /> Adicionar Benefício
+                    </button>
+                </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end pt-4">
+            <button type="submit" className="w-full md:w-auto bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+              <Save className="w-4 h-4" /> Salvar Produto
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {products.map(product => (
+             <div key={product.id} className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden flex flex-col group hover:border-cyan-500/50 transition-colors">
+               <div className="h-40 bg-gray-900 relative">
+                   {product.heroImage && <img src={product.heroImage} alt={product.title} className="w-full h-full object-cover" />}
+                   <div className="absolute top-2 right-2 flex gap-1">
+                        <button onClick={() => { setEditingProduct(product); setIsCreating(false); }} className="p-2 bg-black/50 text-white rounded hover:bg-cyan-600 backdrop-blur-sm"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteProduct(product.id)} className="p-2 bg-red-900/50 text-white rounded hover:bg-red-600 backdrop-blur-sm"><Trash2 className="w-4 h-4" /></button>
+                   </div>
+                   {product.paymentType === 'recurring' && (
+                       <span className="absolute bottom-2 left-2 bg-purple-600/90 text-white text-xs px-2 py-1 rounded font-bold backdrop-blur-sm">Assinatura</span>
+                   )}
+               </div>
+               <div className="p-4 flex-1 flex flex-col">
+                   <h4 className="text-white font-bold text-lg mb-1">{product.title}</h4>
+                   <p className="text-cyan-400 font-bold mb-2">R$ {product.price}</p>
+                   <p className="text-gray-400 text-sm line-clamp-2 mb-4 flex-1">{product.shortDescription}</p>
+                   
+                   <div className="flex justify-between items-center mt-auto pt-4 border-t border-gray-700">
+                       <span className="text-xs text-gray-500 truncate max-w-[120px]">{product.slug}</span>
+                       <a href={`/#/produto/${product.slug}`} target="_blank" className="text-xs text-gray-400 hover:text-white flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Ver no site</a>
+                   </div>
+               </div>
+             </div>
+          ))}
+          {products.length === 0 && <div className="col-span-3 text-gray-500 text-center py-10">Nenhum produto cadastrado.</div>}
+        </div>
+      )}
+    </div>
+  );
 
   const renderBlog = () => (
     <div className="space-y-8">
@@ -542,181 +685,6 @@ export const AdminDashboard: React.FC = () => {
              </div>
           ))}
           {posts.length === 0 && <div className="text-gray-500 text-center py-10">Nenhuma dica postada ainda.</div>}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderContent = () => (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl md:text-2xl font-bold text-white">Páginas e Produtos</h2>
-        {!editingProduct && (
-          <button onClick={handleStartCreateProduct} className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base">
-            <Plus className="w-5 h-5" /> <span className="hidden md:inline">Novo Produto</span>
-          </button>
-        )}
-      </div>
-      
-      {editingProduct ? (
-        <form onSubmit={handleSaveProduct} className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-6 space-y-6">
-          <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
-            <h3 className="text-xl font-bold text-white">{isCreating ? 'Criar Novo Produto' : `Editando: ${editingProduct.title}`}</h3>
-            <button type="button" onClick={() => { setEditingProduct(null); setIsCreating(false); }} className="text-gray-400 hover:text-white">Cancelar</button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-               <ImageUpload 
-                 label="Imagem de Capa (Hero)"
-                 currentImage={editingProduct.heroImage}
-                 onImageChange={(url) => setEditingProduct({ ...editingProduct, heroImage: url })}
-               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Título do Produto (H1)</label>
-              <input value={editingProduct.title} onChange={e => setEditingProduct({...editingProduct, title: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required placeholder="Ex: Zap Marketing Premium" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Título do Menu</label>
-              <input value={editingProduct.menuTitle} onChange={e => setEditingProduct({...editingProduct, menuTitle: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required placeholder="Ex: Zap Marketing" />
-            </div>
-            
-            {/* PRICING & SUBSCRIPTION CONFIG */}
-            <div className="md:col-span-2 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-               <h4 className="text-cyan-400 font-bold mb-4 flex items-center gap-2"><Settings className="w-4 h-4" /> Configuração de Preço e Cobrança</h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Tipo de Cobrança</label>
-                    <select 
-                      value={editingProduct.paymentType || 'one-time'} 
-                      onChange={e => setEditingProduct({...editingProduct, paymentType: e.target.value as any})}
-                      className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-                    >
-                      <option value="one-time">Pagamento Único (Venda)</option>
-                      <option value="recurring">Assinatura (Recorrente)</option>
-                    </select>
-                  </div>
-                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Preço (R$)</label>
-                    <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
-                  </div>
-
-                  {editingProduct.paymentType === 'recurring' && (
-                    <>
-                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Ciclo de Cobrança</label>
-                        <select 
-                          value={editingProduct.billingCycle || 'monthly'} 
-                          onChange={e => setEditingProduct({...editingProduct, billingCycle: e.target.value as any})}
-                          className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-                        >
-                          <option value="monthly">Mensal</option>
-                          <option value="yearly">Anual</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Taxa de Adesão (Setup) - Opcional</label>
-                        <input type="number" step="0.01" value={editingProduct.setupFee || 0} onChange={e => setEditingProduct({...editingProduct, setupFee: parseFloat(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
-                      </div>
-                    </>
-                  )}
-               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Slug (URL)</label>
-              <input value={editingProduct.slug} onChange={e => setEditingProduct({...editingProduct, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required placeholder="ex: zap-marketing" />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-1">Descrição Curta (Resumo)</label>
-              <input value={editingProduct.shortDescription} onChange={e => setEditingProduct({...editingProduct, shortDescription: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" placeholder="Aparece nos cards e no subtítulo da página." />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-1">Descrição Completa</label>
-              <textarea value={editingProduct.fullDescription} onChange={e => setEditingProduct({...editingProduct, fullDescription: e.target.value})} rows={5} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" placeholder="Texto detalhado sobre o produto." />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-2">Lista de Benefícios/Características (Features)</label>
-              <p className="text-xs text-gray-500 mb-3">Adicione os pontos principais que aparecem com "check" na página do produto.</p>
-              {editingProduct.features?.map((feat, idx) => (
-                <div key={idx} className="flex gap-2 mb-2">
-                  <input 
-                    value={feat} 
-                    onChange={(e) => handleFeatureChange(idx, e.target.value)}
-                    className="flex-1 bg-gray-900 border border-gray-700 rounded p-2 text-white text-sm"
-                    placeholder={`Característica ${idx + 1}`}
-                  />
-                  <button type="button" onClick={() => removeFeature(idx)} className="text-red-400 hover:bg-gray-700 p-2 rounded"><X className="w-4 h-4" /></button>
-                </div>
-              ))}
-              <button type="button" onClick={addFeature} className="text-sm text-cyan-400 hover:text-cyan-300 font-bold mt-1 flex items-center gap-1">
-                <Plus className="w-3 h-3" /> Adicionar Item
-              </button>
-            </div>
-            
-             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-1">Texto do Botão (CTA)</label>
-              <input value={editingProduct.ctaText} onChange={e => setEditingProduct({...editingProduct, ctaText: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <button type="submit" className="w-full md:w-auto bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2">
-              <Save className="w-4 h-4" /> Salvar Produto
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map(product => (
-            <div key={product.id} className="bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-between group hover:border-cyan-500/50 transition-all">
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                   <h3 className="text-lg font-bold text-white">{product.title}</h3>
-                </div>
-                <div className="w-full h-32 bg-gray-900 rounded-lg mb-4 overflow-hidden border border-gray-700">
-                  <img src={product.heroImage} alt={product.title} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                         <p className="text-xs text-gray-500 uppercase font-bold">Preço</p>
-                         <div className="text-white font-bold text-xl">R$ {product.price}</div>
-                    </div>
-                    {product.paymentType === 'recurring' && (
-                        <div className="text-right">
-                            <p className="text-xs text-purple-400 uppercase font-bold">Assinatura</p>
-                            <p className="text-xs text-gray-400">{product.billingCycle === 'monthly' ? 'Mensal' : 'Anual'}</p>
-                        </div>
-                    )}
-                </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button 
-                  onClick={() => { setEditingProduct(product); setIsCreating(false); }}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded flex items-center justify-center gap-2 text-sm"
-                >
-                  <Edit className="w-4 h-4" /> Editar
-                </button>
-                <button 
-                  onClick={() => handleDeleteProduct(product.id)}
-                  className="px-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded flex items-center justify-center border border-red-900/50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <a 
-                  href={`#/produto/${product.slug}`} 
-                  target="_blank"
-                  className="px-3 bg-gray-900 hover:bg-black text-gray-400 rounded flex items-center justify-center"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
@@ -838,9 +806,9 @@ export const AdminDashboard: React.FC = () => {
                   <input 
                       type="text" 
                       value={testPhone}
-                      onChange={(e) => setTestPhone(e.target.value)}
+                      onChange={(e) => setTestPhone(normalizePhone(e.target.value))}
                       placeholder="5591999999999"
-                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-500"
+                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-500 font-mono tracking-wide"
                   />
                   <button 
                       onClick={handleTestEvolution}
@@ -850,6 +818,7 @@ export const AdminDashboard: React.FC = () => {
                      <Send className="w-4 h-4" /> {testSending ? 'Enviando...' : 'Testar'}
                   </button>
               </div>
+              <p className="text-[10px] text-gray-500 mt-1">O número é formatado automaticamente para o padrão internacional.</p>
            </div>
            
            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -873,6 +842,35 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-[10px] text-gray-500 mt-1">Variáveis: {'{cliente}'}, {'{produto}'}</p>
            </div>
          </div>
+       </section>
+       
+       {/* Security Section (Password) */}
+       <section className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-8 space-y-6">
+        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4 flex items-center gap-2">
+           <Lock className="w-6 h-6 text-red-400" /> Segurança e Acesso
+        </h3>
+        <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Senha de Admin</label>
+            <div className="relative">
+                <input
+                type={showAdminPass ? "text" : "password"}
+                value={config.adminPassword || ''}
+                onChange={e => setConfig({...config, adminPassword: e.target.value})}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none pr-12"
+                placeholder="Nova Senha"
+                />
+                <button
+                type="button"
+                onClick={() => setShowAdminPass(!showAdminPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                >
+                {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+                Atenção: Ao alterar, você precisará usar a nova senha no próximo login.
+            </p>
+        </div>
        </section>
 
       {/* Identity Section */}

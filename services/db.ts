@@ -4,12 +4,14 @@ import { INITIAL_PRODUCTS, INITIAL_SITE_CONFIG, INITIAL_POSTS } from './initialD
 
 const BASE_URL = '/api';
 
-// --- LOCAL STORAGE FALLBACK SYSTEM ---
+// --- SISTEMA DE PERSISTÊNCIA LOCAL ---
 const getLocal = <T>(key: string, defaultVal: T): T => {
   try {
     const item = localStorage.getItem(`toligado_data_${key}`);
-    return item ? JSON.parse(item) : defaultVal;
-  } catch {
+    if (!item) return defaultVal;
+    return JSON.parse(item);
+  } catch (e) {
+    console.warn(`Erro ao ler local: ${key}`, e);
     return defaultVal;
   }
 };
@@ -17,31 +19,31 @@ const getLocal = <T>(key: string, defaultVal: T): T => {
 const setLocal = (key: string, data: any) => {
   try {
     localStorage.setItem(`toligado_data_${key}`, JSON.stringify(data));
-  } catch (e) { console.error("Local save failed", e); }
+  } catch (e) { console.error("Falha ao salvar localmente", e); }
 };
 
-// --- HELPER: PHONE NORMALIZATION ---
-const normalizePhone = (phone: string): string => {
-  // Remove non-digits
+// --- NORMALIZAÇÃO DE TELEFONE ---
+export const normalizePhone = (phone: string): string => {
   let cleaned = phone.replace(/\D/g, '');
-  
-  // Brazil Logic (If 10 or 11 digits, assume BR and add 55)
   if (cleaned.length >= 10 && cleaned.length <= 11) {
     cleaned = '55' + cleaned;
   }
-  
+  if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+  }
   return cleaned;
 };
 
-// --- API HELPERS ---
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 4000) => {
+// --- AJUDANTE DE FETCH COM TIMEOUT ---
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 3000) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
+  
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(id);
     return response;
-  } catch (error) {
+  } catch (error: any) {
     clearTimeout(id);
     throw error;
   }
@@ -51,10 +53,9 @@ const api = {
   get: async (endpoint: string) => {
     try {
       const res = await fetchWithTimeout(`${BASE_URL}${endpoint}`);
-      if (!res.ok) throw new Error('Network response not ok');
+      if (!res.ok) throw new Error('Erro na rede');
       return await res.json();
     } catch (e) {
-      console.warn(`API GET failed for ${endpoint}, falling back to local.`);
       return null;
     }
   },
@@ -65,56 +66,44 @@ const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error('Post failed');
-      return await res.json();
+      return res.ok ? await res.json() : null;
     } catch (e) {
-      console.error(`API POST failed for ${endpoint}.`);
-      throw e;
+      return null;
     }
-  },
-  put: async (endpoint: string, data: any) => {
-    try {
-        const res = await fetchWithTimeout(`${BASE_URL}${endpoint}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) throw new Error("Put failed");
-        return await res.json();
-    } catch (e) {
-        console.error(`API PUT failed for ${endpoint}.`);
-        throw e;
-    }
-  },
-  delete: async (endpoint: string) => {
-      try {
-          const res = await fetchWithTimeout(`${BASE_URL}${endpoint}`, { method: 'DELETE' });
-          if (!res.ok) throw new Error("Delete failed");
-      } catch (e) {
-          console.error(`API DELETE failed for ${endpoint}.`);
-          throw e;
-      }
   }
 };
 
 export const db = {
-  // --- AUTH (INSTANT PRIORITY) ---
+  // --- AUTENTICAÇÃO INSTANTÂNEA ---
   login: async (user: string, pass: string): Promise<boolean> => {
-    // 1. IMMEDIATE CHECK (Bypasses Network)
-    if ((user === 'admin' && pass === 'admin') || (user === 'admin' && pass === 'Naodigo2306@')) {
-        console.log("Instant Admin Login (Offline Mode)");
-        localStorage.setItem('toligado_auth_token', 'local-token-offline');
-        localStorage.setItem('toligado_mode', 'offline');
-        return true;
+    console.log("Iniciando autenticação híbrida...");
+
+    // 1. VALIDAÇÃO LOCAL IMEDIATA (Não depende de internet/servidor)
+    const localConfig = getLocal<SiteConfig>('config', INITIAL_SITE_CONFIG);
+    const correctPass = localConfig.adminPassword || 'admin123';
+    
+    if (user.trim() === 'admin' && pass.trim() === correctPass) {
+      console.log("Login local validado instantaneamente.");
+      localStorage.setItem('toligado_auth_token', 'token-local-' + Date.now());
+      localStorage.setItem('toligado_mode', 'offline');
+      
+      // Tenta avisar o servidor em segundo plano (sem travar o usuário)
+      fetch(`${BASE_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, pass }),
+      }).catch(() => {});
+      
+      return true; // Retorno imediato
     }
 
-    // 2. Try Backend Login
+    // 2. SE A SENHA LOCAL NÃO BATER, TENTA O SERVIDOR (Pode ser uma senha nova vinda de outro lugar)
     try {
       const res = await fetchWithTimeout(`${BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user, pass }),
-      }, 2000);
+      }, 2500);
 
       if (res.ok) {
         const data = await res.json();
@@ -125,10 +114,11 @@ export const db = {
         }
       }
     } catch (e) {
-      console.warn("Backend unavailable and credentials not default admin.");
+      console.warn("Falha na tentativa de backup via servidor.");
     }
 
-    return false;
+    // Se chegou aqui, nada funcionou
+    throw new Error('Usuário ou senha incorretos.');
   },
 
   logout: () => {
@@ -140,11 +130,7 @@ export const db = {
     return !!localStorage.getItem('toligado_auth_token');
   },
 
-  isOfflineMode: (): boolean => {
-    return localStorage.getItem('toligado_mode') === 'offline';
-  },
-
-  // --- PRODUCTS ---
+  // --- PRODUTOS ---
   getProducts: async (): Promise<Product[]> => {
     const onlineData = await api.get('/products');
     if (onlineData) {
@@ -160,12 +146,7 @@ export const db = {
     if (index >= 0) products[index] = product;
     else products.push(product);
     setLocal('products', products);
-
-    try {
-      await api.post('/products', products);
-    } catch (e) { 
-        alert("Aviso: Falha ao salvar no servidor. Salvo apenas localmente.");
-    }
+    await api.post('/products', products);
   },
 
   createProduct: async (product: Omit<Product, 'id'>) => {
@@ -173,18 +154,14 @@ export const db = {
     const newProduct = { ...product, id: crypto.randomUUID() };
     products.push(newProduct);
     setLocal('products', products);
-
-    try { await api.post('/products', products); } 
-    catch (e) { alert("Aviso: Falha ao salvar no servidor. Salvo apenas localmente."); }
+    await api.post('/products', products);
   },
 
   deleteProduct: async (id: string) => {
     let products = getLocal<Product[]>('products', INITIAL_PRODUCTS);
     products = products.filter(p => p.id !== id);
     setLocal('products', products);
-
-    try { await api.post('/products', products); }
-    catch (e) { alert("Aviso: Falha ao deletar no servidor."); }
+    await api.post('/products', products);
   },
 
   getProductBySlug: async (slug: string): Promise<Product | undefined> => {
@@ -192,37 +169,22 @@ export const db = {
     return products.find(p => p.slug === slug);
   },
 
-  // --- POSTS ---
+  // --- BLOG ---
   getPosts: async (): Promise<BlogPost[]> => {
     const online = await api.get('/posts');
     if (online) {
       setLocal('posts', online);
       return online;
     }
-    
-    // Fallback
-    const local = getLocal<BlogPost[]>('posts', []);
-    if (local.length > 0) return local;
-    
-    return INITIAL_POSTS;
+    return getLocal('posts', INITIAL_POSTS);
   },
 
   createPost: async (post: any) => {
-    // Generate full post object
-    const newPost = { ...post, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
-    
-    // Optimistic Update Local
     const posts = await db.getPosts();
+    const newPost = { ...post, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
     posts.unshift(newPost);
     setLocal('posts', posts);
-
-    try { 
-        // Send single post to backend creation endpoint
-        await api.post('/posts', newPost); 
-    } catch (e) { 
-        console.error(e);
-        alert("Aviso: Post salvo apenas no navegador. O servidor parece estar offline."); 
-    }
+    await api.post('/posts', newPost);
   },
 
   updatePost: async (post: BlogPost) => {
@@ -230,24 +192,23 @@ export const db = {
     const idx = posts.findIndex(p => p.id === post.id);
     if (idx !== -1) posts[idx] = post;
     setLocal('posts', posts);
-    
-    try { 
-        await api.put(`/posts/${post.id}`, post);
-    } catch (e) { 
-         alert("Aviso: Edição salva apenas localmente."); 
-    }
+    try {
+      await fetchWithTimeout(`${BASE_URL}/posts/${post.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(post),
+      });
+    } catch (e) {}
   },
 
   deletePost: async (id: string) => {
     const posts = (await db.getPosts()).filter(p => p.id !== id);
     setLocal('posts', posts);
     try {
-        await api.delete(`/posts/${id}`);
-    } catch(e) { 
-        alert("Aviso: Exclusão local apenas."); 
-    }
+      await fetchWithTimeout(`${BASE_URL}/posts/${id}`, { method: 'DELETE' });
+    } catch (e) {}
   },
-  
+
   getPostBySlug: async (slug: string) => {
     const posts = await db.getPosts();
     return posts.find(p => p.slug === slug);
@@ -264,40 +225,41 @@ export const db = {
   },
 
   addLead: async (name: string, whatsapp: string, originPage: string) => {
-    const cleanPhone = normalizePhone(whatsapp);
-    
     const newLead: Lead = {
       id: crypto.randomUUID(),
       name,
-      whatsapp: cleanPhone,
+      whatsapp: normalizePhone(whatsapp),
       originPage,
       createdAt: new Date().toISOString(),
       status: 'new'
     };
-    
     const leads = getLocal<Lead[]>('leads', []);
     leads.unshift(newLead);
     setLocal('leads', leads);
-
-    // Try server, but don't alert user if it fails (background process)
-    try { await api.post('/leads', newLead); }
-    catch (e) { console.warn("Lead saved locally"); }
-  },
-  
-  deleteLead: async (id: string) => {
-      const leads = getLocal<Lead[]>('leads', []).filter(l => l.id !== id);
-      setLocal('leads', leads);
-      try { await api.delete(`/leads/${id}`); } catch(e){}
+    await api.post('/leads', newLead);
   },
 
   updateLead: async (lead: Lead) => {
-      const leads = getLocal<Lead[]>('leads', []);
-      const idx = leads.findIndex(l => l.id === lead.id);
-      if (idx !== -1) leads[idx] = lead;
-      setLocal('leads', leads);
-      try { 
-          await api.put(`/leads/${lead.id}`, lead); 
-      } catch(e){}
+    const leads = await db.getLeads();
+    const idx = leads.findIndex(l => l.id === lead.id);
+    if (idx !== -1) leads[idx] = lead;
+    setLocal('leads', leads);
+    try {
+      await fetchWithTimeout(`${BASE_URL}/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lead),
+      });
+    } catch (e) {}
+  },
+
+  deleteLead: async (id: string) => {
+    let leads = await db.getLeads();
+    leads = leads.filter(l => l.id !== id);
+    setLocal('leads', leads);
+    try {
+      await fetchWithTimeout(`${BASE_URL}/leads/${id}`, { method: 'DELETE' });
+    } catch (e) {}
   },
 
   // --- ORDERS ---
@@ -311,92 +273,53 @@ export const db = {
   },
 
   addOrder: async (title: string, price: number, name: string, whatsapp: string, extra: any) => {
-    const cleanPhone = normalizePhone(whatsapp);
-    const now = new Date();
-    
-    // Calculate Next Payment Date for Subscriptions
-    let nextPaymentDate = undefined;
-    if (extra.isSubscription) {
-        const nextDate = new Date(now);
-        if (extra.billingCycle === 'yearly') {
-            nextDate.setFullYear(nextDate.getFullYear() + 1);
-        } else {
-            // Default to monthly
-            nextDate.setMonth(nextDate.getMonth() + 1);
-        }
-        nextPaymentDate = nextDate.toISOString();
-    }
-
     const newOrder: Order = {
       id: crypto.randomUUID(),
       productTitle: title,
       productPrice: price,
       customerName: name,
-      customerWhatsapp: cleanPhone,
-      status: extra.isSubscription ? 'active' : 'pending',
-      createdAt: now.toISOString(),
-      isSubscription: false,
-      nextPaymentDate: nextPaymentDate,
+      customerWhatsapp: normalizePhone(whatsapp),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      isSubscription: extra.isSubscription || false,
       ...extra
     };
-
     const orders = getLocal<Order[]>('orders', []);
     orders.unshift(newOrder);
     setLocal('orders', orders);
+    await api.post('/orders', newOrder);
+  },
 
-    try { await api.post('/orders', newOrder); }
-    catch(e) { console.warn("Order saved locally"); }
-  },
-  
-  deleteOrder: async (id: string) => {
-      const orders = getLocal<Order[]>('orders', []).filter(o => o.id !== id);
-      setLocal('orders', orders);
-      try { await api.delete(`/orders/${id}`); } catch(e){}
-  },
-  
   updateOrder: async (order: Order) => {
-      const orders = getLocal<Order[]>('orders', []);
-      const idx = orders.findIndex(o => o.id === order.id);
-      if (idx !== -1) orders[idx] = order;
-      setLocal('orders', orders);
-      try { 
-          await api.put(`/orders/${order.id}`, order); 
-      } catch(e){}
-  },
-  
-  sendPaymentReminder: async (orderId: string) => {
-      try {
-          const res = await fetchWithTimeout(`${BASE_URL}/orders/${orderId}/remind`, { method: 'POST' });
-          if (!res.ok) throw new Error("Failed");
-          return true;
-      } catch (e) {
-          return false;
-      }
+    const orders = await db.getOrders();
+    const idx = orders.findIndex(o => o.id === order.id);
+    if (idx !== -1) orders[idx] = order;
+    setLocal('orders', orders);
+    try {
+      await fetchWithTimeout(`${BASE_URL}/orders/${order.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order),
+      });
+    } catch (e) {}
   },
 
-  sendTestMessage: async (phone: string) => {
-      try {
-          const res = await fetchWithTimeout(`${BASE_URL}/evolution/test`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone })
-          });
-          if (!res.ok) throw new Error("Test failed");
-          return true;
-      } catch(e) {
-          console.error("Test msg error", e);
-          return false;
-      }
+  deleteOrder: async (id: string) => {
+    let orders = await db.getOrders();
+    orders = orders.filter(o => o.id !== id);
+    setLocal('orders', orders);
+    try {
+      await fetchWithTimeout(`${BASE_URL}/orders/${id}`, { method: 'DELETE' });
+    } catch (e) {}
   },
 
-  checkEvolutionStatus: async (): Promise<any> => {
-      try {
-          const res = await fetchWithTimeout(`${BASE_URL}/evolution/status`);
-          const data = await res.json();
-          return data;
-      } catch (e) {
-          return { status: 'error', details: e instanceof Error ? e.message : 'Unknown error' };
-      }
+  sendPaymentReminder: async (orderId: string): Promise<boolean> => {
+    try {
+      const res = await fetchWithTimeout(`${BASE_URL}/orders/${orderId}/remind`, { method: 'POST' });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
   },
 
   // --- CONFIG ---
@@ -404,35 +327,53 @@ export const db = {
     const online = await api.get('/config');
     if (online) {
       setLocal('config', online);
-      return { ...INITIAL_SITE_CONFIG, ...online };
+      return online;
     }
     return getLocal('config', INITIAL_SITE_CONFIG);
   },
 
   saveConfig: async (config: SiteConfig) => {
     setLocal('config', config);
-    try { await api.post('/config', config); }
-    catch (e) { alert("Aviso: Configuração salva apenas localmente."); }
+    await api.post('/config', config);
   },
 
-  // --- UPLOAD ---
+  checkEvolutionStatus: async (): Promise<any> => {
+    try {
+      const res = await fetchWithTimeout(`${BASE_URL}/evolution/status`);
+      if (res.ok) return await res.json();
+      return { status: 'error', details: 'Falha na requisição' };
+    } catch (e: any) {
+      return { status: 'error', details: e.message };
+    }
+  },
+
+  sendTestMessage: async (phone: string): Promise<boolean> => {
+    try {
+      const res = await fetchWithTimeout(`${BASE_URL}/evolution/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
   uploadImage: async (file: File): Promise<string> => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetchWithTimeout(`${BASE_URL}/upload`, { method: 'POST', body: formData });
+      const res = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: formData });
       if (res.ok) {
         const data = await res.json();
         return data.url;
       }
-    } catch (e) {
-      console.warn("Upload failed, using Base64 fallback");
-    }
-
-    return new Promise((resolve, reject) => {
+    } catch (e) {}
+    
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }

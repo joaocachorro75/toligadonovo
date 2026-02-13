@@ -84,6 +84,7 @@ export interface SiteConfig {
   logoImage?: string;
   logoColor: string;
   whatsapp: string;
+  adminPassword?: string; // New password field
   pix: PixConfig;
   home: HomeConfig;
   evolution?: EvolutionConfig;

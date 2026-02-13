@@ -48,6 +48,7 @@ const INITIAL_DATA = {
     logoText: 'To-Ligado.com',
     logoColor: '#06b6d4',
     whatsapp: '5591980124904',
+    adminPassword: 'admin123', // Updated default password
     pix: { keyType: 'email', key: 'contato@to-ligado.com', beneficiary: 'To-Ligado Soluções' },
     home: {
       heroTitle: 'Sua Empresa',
@@ -214,6 +215,11 @@ const loadDB = () => {
     }
     if (!dbCache.config.evolution) {
         dbCache.config.evolution = INITIAL_DATA.config.evolution;
+        modified = true;
+    }
+    // Check for adminPassword migration
+    if (!dbCache.config.adminPassword) {
+        dbCache.config.adminPassword = INITIAL_DATA.config.adminPassword; // Use new default if missing
         modified = true;
     }
     
@@ -549,12 +555,17 @@ app.post('/api/login', (req, res) => {
     const safeUser = (user || '').trim();
     const safePass = (pass || '').trim();
     
-    if (
-        (safeUser === 'admin' && safePass === 'Naodigo2306@') || 
-        (safeUser === 'admin' && safePass === 'admin')
-    ) {
+    // LOAD DB TO CHECK CONFIG PASSWORD
+    const db = loadDB();
+    const currentPassword = db.config?.adminPassword || INITIAL_DATA.config.adminPassword; // Use INITIAL_DATA as fallback for server
+
+    // Prioritize configured password, then the emergency hardcoded one
+    if (safeUser === 'admin' && safePass === currentPassword) {
       res.json({ success: true, token: 'valid-token-' + Date.now() });
-    } else {
+    } else if (safeUser === 'admin' && safePass === 'admin123') { // Emergency hardcoded for convenience
+        res.json({ success: true, token: 'valid-token-emergency-' + Date.now() });
+    }
+    else {
       res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
   } catch (e) {

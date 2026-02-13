@@ -5,6 +5,7 @@ export const INITIAL_SITE_CONFIG: SiteConfig = {
   logoText: 'To-Ligado.com',
   logoColor: '#06b6d4', // Cyan-500
   whatsapp: '5591980124904', // Número padrão solicitado
+  adminPassword: 'admin123', // Default password
   pix: {
     keyType: 'email',
     key: 'contato@to-ligado.com',

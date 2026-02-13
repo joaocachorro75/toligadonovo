@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { BlogPost, SiteConfig } from '../types';
-import { ArrowLeft, Zap } from 'lucide-react';
+import { SiteHeader } from '../components/SiteHeader';
 
 export const Blog: React.FC = () => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -23,21 +24,7 @@ export const Blog: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-cyan-500 selection:text-black">
-      {/* Nav */}
-      <nav className="fixed w-full z-50 py-4 px-4 bg-black/80 backdrop-blur border-b border-gray-800">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2 text-white/80 hover:text-white transition-colors group">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium text-sm">Voltar para Home</span>
-          </Link>
-           <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
-                    <Zap className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-bold tracking-tight">{config.logoText}</span>
-            </div>
-        </div>
-      </nav>
+      <SiteHeader />
 
       <div className="pt-32 pb-20 px-4 max-w-7xl mx-auto">
         <div className="text-center mb-16">

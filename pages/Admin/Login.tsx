@@ -12,36 +12,37 @@ export const AdminLogin: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Clean old session data on mount to prevent stuck states
   useEffect(() => {
     db.logout();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user || !pass) {
+        setErrorMsg('Preencha todos os campos.');
+        return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     
     try {
       const success = await db.login(user.trim(), pass.trim());
-      
       if (success) {
-        // Short delay to allow state to settle before nav
-        setTimeout(() => navigate('/admin/dashboard'), 100);
+        navigate('/admin/dashboard');
       } else {
         setErrorMsg('Usuário ou senha incorretos.');
-        setLoading(false);
       }
-    } catch (e) {
-      console.error(e);
-      setErrorMsg('Erro inesperado.');
+    } catch (e: any) {
+      console.error("Erro no login:", e);
+      setErrorMsg(e.message || 'Erro ao conectar ao servidor.');
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-600/20 rounded-full blur-[100px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[100px]" />
@@ -69,6 +70,7 @@ export const AdminLogin: React.FC = () => {
               onChange={(e) => setUser(e.target.value)}
               className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-colors"
               placeholder="admin"
+              disabled={loading}
             />
           </div>
           <div>
@@ -80,6 +82,7 @@ export const AdminLogin: React.FC = () => {
                 onChange={(e) => setPass(e.target.value)}
                 className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-colors pr-12"
                 placeholder="••••••••"
+                disabled={loading}
               />
               <button
                 type="button"
@@ -92,7 +95,7 @@ export const AdminLogin: React.FC = () => {
           </div>
 
           {errorMsg && (
-            <div className="bg-red-900/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-3 border border-red-900/50 animate-fade-in">
+            <div className="bg-red-900/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-3 border border-red-900/50 animate-pulse">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
               <span>{errorMsg}</span>
             </div>

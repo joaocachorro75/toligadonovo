@@ -2,12 +2,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
-import { Pix } from '../services/pix'; // Import PIX helper
+import { Pix } from '../services/pix';
 import { Product, SiteConfig } from '../types';
 import { LeadForm } from '../components/LeadForm';
-import { ArrowLeft, Check, Zap, ShoppingBag, X, ShieldCheck, Clock, Award, Send, RefreshCcw, Copy } from 'lucide-react';
+import { Check, Zap, ShoppingBag, X, ShieldCheck, Clock, Award, Send, RefreshCcw, Copy } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { FloatingWhatsApp } from '../components/FloatingWhatsApp';
+import { SiteHeader } from '../components/SiteHeader';
 
 export const ProductPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -44,16 +45,15 @@ export const ProductPage: React.FC = () => {
       return total;
   };
 
-  // Generate PIX Payload dynamically
   const pixPayload = useMemo(() => {
     if (!product || !config) return '';
     const total = calculateTotalFirstPayment();
-    const txId = `TOLIGADO${Date.now().toString().slice(-4)}`; // Short unique ID
+    const txId = `TOLIGADO${Date.now().toString().slice(-4)}`;
     
     return Pix.payload({
         key: config.pix.key,
         name: config.pix.beneficiary,
-        city: 'Online', // Default city as it is not in config
+        city: 'Online',
         amount: total,
         txid: txId,
         description: product.title
@@ -79,7 +79,6 @@ export const ProductPage: React.FC = () => {
   const handleSendProof = async () => {
     if (!config.whatsapp) return;
     
-    // Save Order to Admin
     await db.addOrder(
       product.title,
       product.price,
@@ -92,7 +91,6 @@ export const ProductPage: React.FC = () => {
       }
     );
 
-    // Open WhatsApp
     const cleaned = config.whatsapp.replace(/\D/g, '');
     const namePart = customerName ? `Meu nome é: *${customerName}*.` : 'Gostaria de informar o pagamento.';
     
@@ -107,13 +105,13 @@ export const ProductPage: React.FC = () => {
     const message = `Olá, acabei de realizar o pagamento via PIX para o produto: *${product.title}* (${payDetails}). ${namePart} Segue o comprovante em anexo.`;
     window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`, '_blank');
     
-    // Close Modal
     setTimeout(() => setShowPixModal(false), 2000);
   };
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-cyan-500 selection:text-black">
       <FloatingWhatsApp phoneNumber={config.whatsapp} />
+      <SiteHeader />
       
       {/* Pix Modal */}
       {showPixModal && (
@@ -234,32 +232,8 @@ export const ProductPage: React.FC = () => {
         </div>
       )}
 
-      {/* Nav */}
-      <nav className="fixed w-full z-50 py-4 px-4 transition-all duration-300 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2 text-white/80 hover:text-white transition-colors group bg-black/50 px-4 py-2 rounded-full border border-white/10 hover:border-white/30">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium text-sm">Voltar</span>
-          </Link>
-          
-           <div className="flex items-center gap-2">
-              {config.logoImage ? (
-                <img src={config.logoImage} alt={config.logoText} className="h-8 md:h-10 object-contain" />
-              ) : (
-                <>
-                  <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg">
-                    <Zap className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="font-bold tracking-tight">{config.logoText}</span>
-                </>
-              )}
-            </div>
-        </div>
-      </nav>
-
       {/* Immersive Hero */}
       <header className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-        {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
             src={product.heroImage} 

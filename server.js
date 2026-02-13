@@ -249,8 +249,13 @@ const sendEvolutionMessage = async (to, text) => {
     const db = loadDB();
     const config = db.config.evolution;
     
-    if (!config || !config.enabled || !config.baseUrl || !config.apiKey) {
-        console.log("Evolution API disabled or not configured.");
+    if (!config || !config.enabled) {
+        console.log(`[Evolution API] Aborted: Integration is DISABLED in settings.`);
+        return false;
+    }
+    
+    if (!config.baseUrl || !config.apiKey) {
+        console.log("Evolution API not configured.");
         return false;
     }
 

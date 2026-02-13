@@ -235,6 +235,15 @@ export const AdminDashboard: React.FC = () => {
       // Evolution standard 'open' means connected
       if (status === 'open') {
         setConnectionStatus('open');
+        // AUTO-ENABLE IF CONNECTION WORKS
+        setConfig(prev => ({
+            ...prev,
+            evolution: { ...prev.evolution!, enabled: true }
+        }));
+        // Small feedback
+        if (!config.evolution?.enabled) {
+            alert("Conexão estabelecida! O status foi ativado automaticamente. Lembre-se de clicar em SALVAR CONFIGURAÇÕES.");
+        }
       }
       else if (status === 'close') {
         setConnectionStatus('close');
@@ -251,12 +260,23 @@ export const AdminDashboard: React.FC = () => {
           alert("Digite um número para testar");
           return;
       }
+      
+      if (!config.evolution?.enabled) {
+          alert("ERRO: O status está DESATIVADO (vermelho). Ative o botão 'Status' e clique em 'Salvar Configurações' antes de testar.");
+          return;
+      }
+
       setTestSending(true);
+      
+      // We need to save first to ensure backend has the API Key if user typed it but didn't save
+      // But saving triggers reload/alert. Let's just try sending.
+      // Ideally user should save config first.
+      
       const success = await db.sendTestMessage(testPhone);
       setTestSending(false);
       
       if (success) alert("Mensagem de teste enviada com sucesso! Verifique o WhatsApp.");
-      else alert("Falha ao enviar. Verifique se a instância está conectada e se a API Key da Instância está correta.");
+      else alert("Falha ao enviar. Verifique se clicou em 'Salvar Configurações' para atualizar o servidor com a nova chave.");
   };
 
   // --- Formatters ---
@@ -699,6 +719,7 @@ export const AdminDashboard: React.FC = () => {
             >
                 {config.evolution?.enabled ? 'ATIVADO' : 'DESATIVADO'}
             </button>
+            <span className="text-xs text-gray-500">(O envio de mensagens só ocorre se estiver ATIVADO)</span>
          </div>
 
          <div className="space-y-4">

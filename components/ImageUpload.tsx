@@ -31,7 +31,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ label, currentImage, o
       const url = await db.uploadImage(file);
       onImageChange(url);
     } catch (err) {
-      setError('Erro ao enviar imagem.');
+      setError('Erro ao enviar imagem. Tente novamente.');
       console.error(err);
     } finally {
       setLoading(false);

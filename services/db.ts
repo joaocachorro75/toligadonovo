@@ -9,29 +9,44 @@ const api = {
       if (!res.ok) throw new Error('API Error');
       return await res.json();
     } catch (e) {
-      console.error(e);
+      console.error(`Error fetching ${endpoint}:`, e);
       return null;
     }
   },
   post: async (endpoint: string, data: any) => {
-    const res = await fetch(`/api${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return await res.json();
+    try {
+      const res = await fetch(`/api${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e) {
+      console.error(`Error posting ${endpoint}:`, e);
+      throw e;
+    }
   },
   put: async (endpoint: string, data: any) => {
-    const res = await fetch(`/api${endpoint}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return await res.json();
+    try {
+      const res = await fetch(`/api${endpoint}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e) {
+      console.error(`Error putting ${endpoint}:`, e);
+      throw e;
+    }
   },
   delete: async (endpoint: string) => {
-    const res = await fetch(`/api${endpoint}`, { method: 'DELETE' });
-    return await res.json();
+    try {
+      const res = await fetch(`/api${endpoint}`, { method: 'DELETE' });
+      return await res.json();
+    } catch (e) {
+      console.error(`Error deleting ${endpoint}:`, e);
+      throw e;
+    }
   }
 };
 
@@ -39,7 +54,9 @@ export const db = {
   // --- Products ---
   getProducts: async (): Promise<Product[]> => {
     const data = await api.get('/products');
-    return data && data.length > 0 ? data : INITIAL_PRODUCTS;
+    // Fallback to initial if empty or null
+    if (!data || data.length === 0) return INITIAL_PRODUCTS;
+    return data;
   },
 
   saveProduct: async (product: Product) => {
@@ -158,6 +175,9 @@ export const db = {
       method: 'POST',
       body: formData
     });
+    
+    if (!res.ok) throw new Error('Upload failed');
+    
     const data = await res.json();
     return data.url;
   },

@@ -13,8 +13,8 @@ WORKDIR /app
 # Install server dependencies
 RUN npm init -y && npm install express multer
 
-# Copy built assets from Stage 1
-COPY --from=build /app/build ./build
+# Copy built assets from Stage 1 (Vite outputs to 'dist')
+COPY --from=build /app/dist ./dist
 
 # Copy server file
 COPY server.js ./

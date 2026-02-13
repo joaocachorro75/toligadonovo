@@ -14,10 +14,14 @@ export const Home: React.FC = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      const p = await db.getProducts();
-      const c = await db.getConfig();
-      setProducts(p);
-      setConfig(c);
+      try {
+        const p = await db.getProducts();
+        const c = await db.getConfig();
+        setProducts(p);
+        setConfig(c);
+      } catch (e) {
+        console.error("Failed to load home data", e);
+      }
     };
     loadData();
   }, []);

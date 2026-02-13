@@ -565,42 +565,4 @@ export const AdminDashboard: React.FC = () => {
       </button>
     </div>
   );
-
-  return (
-    <AdminLayout>
-      <div className="mb-8">
-        <div className="flex space-x-4 border-b border-gray-800 overflow-x-auto">
-          <button 
-            className={`pb-4 px-2 font-medium transition-colors whitespace-nowrap ${activeTab === 'leads' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-gray-300'}`}
-            onClick={() => handleTabClick('leads')}
-          >
-            Leads (Interesse)
-          </button>
-          <button 
-            className={`pb-4 px-2 font-medium transition-colors whitespace-nowrap ${activeTab === 'orders' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-gray-300'}`}
-            onClick={() => handleTabClick('orders')}
-          >
-            Vendas (PIX)
-          </button>
-          <button 
-            className={`pb-4 px-2 font-medium transition-colors whitespace-nowrap ${activeTab === 'content' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-gray-300'}`}
-            onClick={() => handleTabClick('content')}
-          >
-            Produtos
-          </button>
-          <button 
-            className={`pb-4 px-2 font-medium transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-gray-300'}`}
-            onClick={() => handleTabClick('settings')}
-          >
-            Configurações
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'leads' && renderLeads()}
-      {activeTab === 'orders' && renderOrders()}
-      {activeTab === 'content' && renderContent()}
-      {activeTab === 'settings' && renderSettings()}
-    </AdminLayout>
-  );
 };

@@ -16,12 +16,14 @@ export const AdminLogin: React.FC = () => {
     setError(false);
     
     try {
-      if (await db.login(user, pass)) {
+      const success = await db.login(user, pass);
+      if (success) {
         navigate('/admin/dashboard');
       } else {
         setError(true);
       }
     } catch (e) {
+      console.error(e);
       setError(true);
     } finally {
       setLoading(false);

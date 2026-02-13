@@ -18,11 +18,15 @@ export const ProductPage: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       if (slug) {
-        const found = await db.getProductBySlug(slug);
-        const c = await db.getConfig();
-        setProduct(found);
-        setConfig(c);
-        window.scrollTo(0, 0);
+        try {
+          const found = await db.getProductBySlug(slug);
+          const c = await db.getConfig();
+          setProduct(found);
+          setConfig(c);
+          window.scrollTo(0, 0);
+        } catch (e) {
+          console.error(e);
+        }
       }
     };
     loadData();

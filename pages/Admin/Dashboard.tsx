@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../../services/db';
 import { Lead, Product, SiteConfig, Order, BlogPost } from '../../types';
-import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ImageUpload } from '../../components/ImageUpload';
 import { INITIAL_SITE_CONFIG } from '../../services/initialData';
@@ -37,6 +37,7 @@ export const AdminDashboard: React.FC = () => {
   // Connection Status State
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'open' | 'close' | 'error' | null>(null);
   const [connectionError, setConnectionError] = useState<string>('');
+  const [errorCode, setErrorCode] = useState<number | null>(null);
 
   // Editing States
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -226,6 +227,7 @@ export const AdminDashboard: React.FC = () => {
   const handleCheckConnection = async () => {
       setConnectionStatus('checking');
       setConnectionError('');
+      setErrorCode(null);
       
       const result = await db.checkEvolutionStatus();
       const status = result.status;
@@ -240,6 +242,7 @@ export const AdminDashboard: React.FC = () => {
       else {
         setConnectionStatus('error');
         setConnectionError(result.details || 'Erro desconhecido');
+        if (result.code) setErrorCode(result.code);
       }
   };
 
@@ -664,7 +667,25 @@ export const AdminDashboard: React.FC = () => {
             )}
          </div>
          
-         {connectionError && (
+         {/* 401 SPECIFIC ERROR BOX */}
+         {errorCode === 401 && (
+             <div className="bg-red-900/40 border-l-4 border-red-500 text-red-200 p-4 rounded-r-lg mb-4">
+                <div className="flex items-start gap-3">
+                   <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+                   <div>
+                       <h4 className="font-bold text-sm mb-1">Acesso Negado (401 Unauthorized)</h4>
+                       <p className="text-xs mb-2">A combinação de <strong>Nome da Instância</strong> e <strong>API Key</strong> está incorreta.</p>
+                       <ul className="text-xs list-disc ml-4 space-y-1 text-red-300">
+                           <li>Verifique se o nome da instância está correto (letras maiúsculas importam!).</li>
+                           <li>Se estiver usando uma chave de instância, garanta que ela pertence a esta instância.</li>
+                           <li>A Global API Key também funciona aqui.</li>
+                       </ul>
+                   </div>
+                </div>
+             </div>
+         )}
+         
+         {connectionError && errorCode !== 401 && (
             <div className="bg-red-900/40 border border-red-500/30 text-red-300 p-3 rounded-lg text-xs break-all">
                 <strong>Erro de Conexão:</strong> {connectionError}
             </div>

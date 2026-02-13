@@ -496,7 +496,10 @@ app.get('/api/evolution/status', async (req, res) => {
         const instanceName = (config.instanceName || '').trim();
         let baseUrl = (config.baseUrl || '').trim().replace(/\/$/, '');
         
-        if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
+        // Only prepend https if http is not present. Do not force https if user typed http.
+        if (!baseUrl.startsWith('http')) {
+             baseUrl = 'https://' + baseUrl;
+        }
         
         const url = `${baseUrl}/instance/connectionState/${instanceName}`;
         console.log(`Checking status at: ${url}`);
@@ -511,7 +514,16 @@ app.get('/api/evolution/status', async (req, res) => {
             res.json({ status: state, raw: data });
         } else {
             const errorText = await response.text();
-            console.error("Evolution Status Error:", errorText);
+            
+            // SPECIFIC 401 DEBUGGING
+            if (response.status === 401) {
+                console.error(`[Evolution API] 401 UNAUTHORIZED at ${url}`);
+                console.error(`[Evolution API] Headers sent: { apikey: "${apiKey.substring(0, 5)}***" }`);
+                console.error(`[Evolution API] Verify if instance '${instanceName}' exists and if the key is correct.`);
+            } else {
+                console.error("Evolution Status Error:", errorText);
+            }
+            
             res.json({ status: 'error', details: errorText, code: response.status });
         }
     } catch (e) {

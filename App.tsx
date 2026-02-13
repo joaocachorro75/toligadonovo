@@ -24,17 +24,23 @@ function App() {
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLogin />} />
         
-        {/* Protected Routes - All dashboard tabs handled inside the component for simplicity in this demo, 
-            but using URL paths helps persistence on refresh */}
+        {/* Protected Admin Routes */}
+        {/* Redirect generic dashboard to the first tab (leads) to prevent empty render */}
         <Route path="/admin/dashboard" element={
-          <ProtectedRoute>
-            <AdminDashboard />
-          </ProtectedRoute>
+            <ProtectedRoute>
+                <Navigate to="/admin/leads" replace />
+            </ProtectedRoute>
         } />
+        
         <Route path="/admin/leads" element={
           <ProtectedRoute>
             <AdminDashboard />
           </ProtectedRoute>
+        } />
+        <Route path="/admin/orders" element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
         } />
         <Route path="/admin/content" element={
           <ProtectedRoute>

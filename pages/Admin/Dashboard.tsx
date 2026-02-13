@@ -37,10 +37,20 @@ export const AdminDashboard: React.FC = () => {
   }, [activeTab]);
 
   const refreshData = async () => {
-    setLeads(await db.getLeads());
-    setProducts(await db.getProducts());
-    setConfig(await db.getConfig());
-    setOrders(await db.getOrders());
+    try {
+        const [l, p, c, o] = await Promise.all([
+            db.getLeads(),
+            db.getProducts(),
+            db.getConfig(),
+            db.getOrders()
+        ]);
+        setLeads(l);
+        setProducts(p);
+        setConfig(c || INITIAL_SITE_CONFIG);
+        setOrders(o);
+    } catch (e) {
+        console.error("Error loading admin data", e);
+    }
   };
 
   const handleTabClick = (tab: string) => {
@@ -204,6 +214,7 @@ export const AdminDashboard: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {filteredLeads.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center">Nenhum lead encontrado.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -382,9 +393,13 @@ export const AdminDashboard: React.FC = () => {
     </div>
   );
 
-  const renderSettings = () => (
+  const renderSettings = () => {
+    // Defensive check
+    if (!config || !config.home || !config.pix) return <div className="text-white">Carregando configurações...</div>;
+
+    return (
     <div className="max-w-2xl space-y-12">
-      {/* WHATSAPP CONFIG SECTION - HIGHLIGHTED */}
+      {/* WHATSAPP CONFIG SECTION */}
       <section className="bg-gray-800 border-2 border-green-500/30 rounded-xl p-8 space-y-6 shadow-lg shadow-green-900/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-4 opacity-10">
            <Phone className="w-24 h-24 text-green-500" />
@@ -455,7 +470,7 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Título Principal</label>
             <input 
-              value={config.home.heroTitle}
+              value={config.home?.heroTitle || ''}
               onChange={e => setConfig({...config, home: { ...config.home, heroTitle: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -463,7 +478,7 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Destaque Colorido</label>
             <input 
-              value={config.home.heroHighlight}
+              value={config.home?.heroHighlight || ''}
               onChange={e => setConfig({...config, home: { ...config.home, heroHighlight: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -471,7 +486,7 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Descrição</label>
             <textarea 
-              value={config.home.heroDescription}
+              value={config.home?.heroDescription || ''}
               onChange={e => setConfig({...config, home: { ...config.home, heroDescription: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
               rows={3}
@@ -484,7 +499,7 @@ export const AdminDashboard: React.FC = () => {
            <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Título</label>
             <input 
-              value={config.home.servicesTitle}
+              value={config.home?.servicesTitle || ''}
               onChange={e => setConfig({...config, home: { ...config.home, servicesTitle: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -492,7 +507,7 @@ export const AdminDashboard: React.FC = () => {
            <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Descrição</label>
             <input 
-              value={config.home.servicesDescription}
+              value={config.home?.servicesDescription || ''}
               onChange={e => setConfig({...config, home: { ...config.home, servicesDescription: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -504,7 +519,7 @@ export const AdminDashboard: React.FC = () => {
            <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Título</label>
             <input 
-              value={config.home.contactTitle}
+              value={config.home?.contactTitle || ''}
               onChange={e => setConfig({...config, home: { ...config.home, contactTitle: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -512,7 +527,7 @@ export const AdminDashboard: React.FC = () => {
            <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Descrição</label>
             <input 
-              value={config.home.contactDescription}
+              value={config.home?.contactDescription || ''}
               onChange={e => setConfig({...config, home: { ...config.home, contactDescription: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -527,7 +542,7 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Tipo de Chave</label>
             <select 
-              value={config.pix.keyType}
+              value={config.pix?.keyType || 'email'}
               onChange={e => setConfig({...config, pix: { ...config.pix, keyType: e.target.value as any }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             >
@@ -541,7 +556,7 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Chave PIX</label>
             <input 
-              value={config.pix.key}
+              value={config.pix?.key || ''}
               onChange={e => setConfig({...config, pix: { ...config.pix, key: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -549,7 +564,7 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Nome do Beneficiário</label>
             <input 
-              value={config.pix.beneficiary}
+              value={config.pix?.beneficiary || ''}
               onChange={e => setConfig({...config, pix: { ...config.pix, beneficiary: e.target.value }})}
               className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
             />
@@ -564,5 +579,14 @@ export const AdminDashboard: React.FC = () => {
         Salvar Todas as Configurações
       </button>
     </div>
+  )};
+
+  return (
+    <AdminLayout>
+      {activeTab === 'leads' && renderLeads()}
+      {activeTab === 'orders' && renderOrders()}
+      {activeTab === 'content' && renderContent()}
+      {activeTab === 'settings' && renderSettings()}
+    </AdminLayout>
   );
 };

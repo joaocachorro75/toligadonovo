@@ -11,7 +11,6 @@ const getLocal = <T>(key: string, defaultVal: T): T => {
     if (!item) return defaultVal;
     return JSON.parse(item);
   } catch (e) {
-    console.warn(`Erro ao ler local: ${key}`, e);
     return defaultVal;
   }
 };
@@ -38,7 +37,6 @@ export const normalizePhone = (phone: string): string => {
 const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 3000) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
-  
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(id);
@@ -74,37 +72,25 @@ const api = {
 };
 
 export const db = {
-  // --- AUTENTICAÇÃO INSTANTÂNEA ---
   login: async (user: string, pass: string): Promise<boolean> => {
-    console.log("Iniciando autenticação híbrida...");
-
-    // 1. VALIDAÇÃO LOCAL IMEDIATA (Não depende de internet/servidor)
     const localConfig = getLocal<SiteConfig>('config', INITIAL_SITE_CONFIG);
     const correctPass = localConfig.adminPassword || 'admin123';
-    
     if (user.trim() === 'admin' && pass.trim() === correctPass) {
-      console.log("Login local validado instantaneamente.");
       localStorage.setItem('toligado_auth_token', 'token-local-' + Date.now());
       localStorage.setItem('toligado_mode', 'offline');
-      
-      // Tenta avisar o servidor em segundo plano (sem travar o usuário)
       fetch(`${BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user, pass }),
       }).catch(() => {});
-      
-      return true; // Retorno imediato
+      return true;
     }
-
-    // 2. SE A SENHA LOCAL NÃO BATER, TENTA O SERVIDOR (Pode ser uma senha nova vinda de outro lugar)
     try {
       const res = await fetchWithTimeout(`${BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user, pass }),
       }, 2500);
-
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -113,11 +99,7 @@ export const db = {
           return true;
         }
       }
-    } catch (e) {
-      console.warn("Falha na tentativa de backup via servidor.");
-    }
-
-    // Se chegou aqui, nada funcionou
+    } catch (e) {}
     throw new Error('Usuário ou senha incorretos.');
   },
 
@@ -130,10 +112,9 @@ export const db = {
     return !!localStorage.getItem('toligado_auth_token');
   },
 
-  // --- PRODUTOS ---
   getProducts: async (): Promise<Product[]> => {
     const onlineData = await api.get('/products');
-    if (onlineData) {
+    if (onlineData && Array.isArray(onlineData) && onlineData.length > 0) {
       setLocal('products', onlineData);
       return onlineData;
     }
@@ -169,10 +150,9 @@ export const db = {
     return products.find(p => p.slug === slug);
   },
 
-  // --- BLOG ---
   getPosts: async (): Promise<BlogPost[]> => {
     const online = await api.get('/posts');
-    if (online) {
+    if (online && Array.isArray(online) && online.length > 0) {
       setLocal('posts', online);
       return online;
     }
@@ -184,6 +164,7 @@ export const db = {
     const newPost = { ...post, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
     posts.unshift(newPost);
     setLocal('posts', posts);
+    // Fix: use '/posts' instead of '/api/posts' since api.post prepends BASE_URL
     await api.post('/posts', newPost);
   },
 
@@ -214,7 +195,6 @@ export const db = {
     return posts.find(p => p.slug === slug);
   },
 
-  // --- LEADS ---
   getLeads: async (): Promise<Lead[]> => {
     const online = await api.get('/leads');
     if (online) {
@@ -239,10 +219,21 @@ export const db = {
     await api.post('/leads', newLead);
   },
 
+  // Fix: Added deleteLead to support AdminDashboard
+  deleteLead: async (id: string) => {
+    let leads = getLocal<Lead[]>('leads', []);
+    leads = leads.filter(l => l.id !== id);
+    setLocal('leads', leads);
+    try {
+      await fetchWithTimeout(`${BASE_URL}/leads/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+  },
+
+  // Fix: Added updateLead to support AdminDashboard status changes
   updateLead: async (lead: Lead) => {
-    const leads = await db.getLeads();
-    const idx = leads.findIndex(l => l.id === lead.id);
-    if (idx !== -1) leads[idx] = lead;
+    const leads = getLocal<Lead[]>('leads', []);
+    const index = leads.findIndex(l => l.id === lead.id);
+    if (index >= 0) leads[index] = lead;
     setLocal('leads', leads);
     try {
       await fetchWithTimeout(`${BASE_URL}/leads/${lead.id}`, {
@@ -253,16 +244,6 @@ export const db = {
     } catch (e) {}
   },
 
-  deleteLead: async (id: string) => {
-    let leads = await db.getLeads();
-    leads = leads.filter(l => l.id !== id);
-    setLocal('leads', leads);
-    try {
-      await fetchWithTimeout(`${BASE_URL}/leads/${id}`, { method: 'DELETE' });
-    } catch (e) {}
-  },
-
-  // --- ORDERS ---
   getOrders: async (): Promise<Order[]> => {
     const online = await api.get('/orders');
     if (online) {
@@ -290,10 +271,21 @@ export const db = {
     await api.post('/orders', newOrder);
   },
 
+  // Fix: Added deleteOrder to support AdminDashboard
+  deleteOrder: async (id: string) => {
+    let orders = getLocal<Order[]>('orders', []);
+    orders = orders.filter(o => o.id !== id);
+    setLocal('orders', orders);
+    try {
+      await fetchWithTimeout(`${BASE_URL}/orders/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+  },
+
+  // Fix: Added updateOrder to support AdminDashboard status changes
   updateOrder: async (order: Order) => {
-    const orders = await db.getOrders();
-    const idx = orders.findIndex(o => o.id === order.id);
-    if (idx !== -1) orders[idx] = order;
+    const orders = getLocal<Order[]>('orders', []);
+    const index = orders.findIndex(o => o.id === order.id);
+    if (index >= 0) orders[index] = order;
     setLocal('orders', orders);
     try {
       await fetchWithTimeout(`${BASE_URL}/orders/${order.id}`, {
@@ -304,25 +296,6 @@ export const db = {
     } catch (e) {}
   },
 
-  deleteOrder: async (id: string) => {
-    let orders = await db.getOrders();
-    orders = orders.filter(o => o.id !== id);
-    setLocal('orders', orders);
-    try {
-      await fetchWithTimeout(`${BASE_URL}/orders/${id}`, { method: 'DELETE' });
-    } catch (e) {}
-  },
-
-  sendPaymentReminder: async (orderId: string): Promise<boolean> => {
-    try {
-      const res = await fetchWithTimeout(`${BASE_URL}/orders/${orderId}/remind`, { method: 'POST' });
-      return res.ok;
-    } catch (e) {
-      return false;
-    }
-  },
-
-  // --- CONFIG ---
   getConfig: async (): Promise<SiteConfig> => {
     const online = await api.get('/config');
     if (online) {
@@ -341,12 +314,31 @@ export const db = {
     try {
       const res = await fetchWithTimeout(`${BASE_URL}/evolution/status`);
       if (res.ok) return await res.json();
-      return { status: 'error', details: 'Falha na requisição' };
-    } catch (e: any) {
-      return { status: 'error', details: e.message };
+      return { status: 'error' };
+    } catch (e) {
+      return { status: 'error' };
     }
   },
 
+  // Fix: Added sendPaymentReminder to support AdminDashboard Evolution API integration
+  sendPaymentReminder: async (orderId: string): Promise<boolean> => {
+    try {
+      const res = await fetchWithTimeout(`${BASE_URL}/evolution/reminder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.success;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // Fix: Added sendTestMessage to support AdminDashboard Evolution API test functionality
   sendTestMessage: async (phone: string): Promise<boolean> => {
     try {
       const res = await fetchWithTimeout(`${BASE_URL}/evolution/test`, {
@@ -354,7 +346,11 @@ export const db = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       });
-      return res.ok;
+      if (res.ok) {
+        const data = await res.json();
+        return data.success;
+      }
+      return false;
     } catch (e) {
       return false;
     }
@@ -370,7 +366,6 @@ export const db = {
         return data.url;
       }
     } catch (e) {}
-    
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

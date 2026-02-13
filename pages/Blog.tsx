@@ -1,21 +1,24 @@
 
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { db } from '../services/db';
-import { BlogPost, SiteConfig } from '../types';
+import { BlogPost, SiteConfig, Product } from '../types';
 import { SiteHeader } from '../components/SiteHeader';
+import { SiteFooter } from '../components/SiteFooter';
 
 export const Blog: React.FC = () => {
   const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [config, setConfig] = useState<SiteConfig | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const loadData = async () => {
         const p = await db.getPosts();
         const c = await db.getConfig();
+        const allP = await db.getProducts();
         setPosts(p);
         setConfig(c);
+        setProducts(allP);
     };
     loadData();
   }, []);
@@ -55,6 +58,8 @@ export const Blog: React.FC = () => {
             </div>
         )}
       </div>
+
+      <SiteFooter config={config} products={products} />
     </div>
   );
 };

@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
+import { Pix } from '../services/pix'; // Import PIX helper
 import { Product, SiteConfig } from '../types';
 import { LeadForm } from '../components/LeadForm';
-import { ArrowLeft, Check, Zap, ShoppingBag, X, ShieldCheck, Clock, Award, Send, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Check, Zap, ShoppingBag, X, ShieldCheck, Clock, Award, Send, RefreshCcw, Copy } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { FloatingWhatsApp } from '../components/FloatingWhatsApp';
 
@@ -14,6 +16,7 @@ export const ProductPage: React.FC = () => {
   const [showPixModal, setShowPixModal] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [whatsappContact, setWhatsappContact] = useState('');
+  const [copyFeedback, setCopyFeedback] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -31,6 +34,37 @@ export const ProductPage: React.FC = () => {
     };
     loadData();
   }, [slug]);
+
+  const calculateTotalFirstPayment = () => {
+      if (!product) return 0;
+      let total = product.price;
+      if (product.paymentType === 'recurring' && product.setupFee) {
+          total += product.setupFee;
+      }
+      return total;
+  };
+
+  // Generate PIX Payload dynamically
+  const pixPayload = useMemo(() => {
+    if (!product || !config) return '';
+    const total = calculateTotalFirstPayment();
+    const txId = `TOLIGADO${Date.now().toString().slice(-4)}`; // Short unique ID
+    
+    return Pix.payload({
+        key: config.pix.key,
+        name: config.pix.beneficiary,
+        city: 'Online', // Default city as it is not in config
+        amount: total,
+        txid: txId,
+        description: product.title
+    });
+  }, [product, config]);
+
+  const handleCopyPix = () => {
+      navigator.clipboard.writeText(pixPayload);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+  };
 
   if (!product || !config) {
     return (
@@ -77,14 +111,6 @@ export const ProductPage: React.FC = () => {
     setTimeout(() => setShowPixModal(false), 2000);
   };
 
-  const calculateTotalFirstPayment = () => {
-      let total = product.price;
-      if (product.paymentType === 'recurring' && product.setupFee) {
-          total += product.setupFee;
-      }
-      return total;
-  };
-
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-cyan-500 selection:text-black">
       <FloatingWhatsApp phoneNumber={config.whatsapp} />
@@ -92,7 +118,7 @@ export const ProductPage: React.FC = () => {
       {/* Pix Modal */}
       {showPixModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 max-w-md w-full relative shadow-2xl shadow-cyan-900/40 transform scale-100 flex flex-col max-h-[90vh] overflow-y-auto">
+          <div className="bg-gray-900 border border-gray-700 rounded-3xl p-6 md:p-8 max-w-md w-full relative shadow-2xl shadow-cyan-900/40 transform scale-100 flex flex-col max-h-[95vh] overflow-y-auto custom-scrollbar">
             <button 
               onClick={() => setShowPixModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-full hover:bg-gray-800 transition-colors"
@@ -101,62 +127,104 @@ export const ProductPage: React.FC = () => {
             </button>
             
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-cyan-500/10 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-cyan-500/30">
-                <ShoppingBag className="w-8 h-8 text-cyan-500" />
+              <div className="mx-auto w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mb-4 ring-1 ring-cyan-500/30">
+                <ShoppingBag className="w-6 h-6 text-cyan-500" />
               </div>
-              <h3 className="text-2xl font-bold mb-2 text-white">Pagamento Seguro via PIX</h3>
+              <h3 className="text-xl font-bold mb-1 text-white">Pagamento Seguro via PIX</h3>
+              <p className="text-xs text-gray-500 mb-4">Aprovação imediata</p>
               
-              <div className="mb-6">
-                <p className="text-gray-400 text-sm">Valor total a pagar agora:</p>
-                <p className="text-3xl font-bold text-white">
+              <div className="mb-6 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                <p className="text-gray-400 text-xs uppercase tracking-wide font-bold">Total a Pagar</p>
+                <p className="text-3xl font-black text-white">
                     R$ {calculateTotalFirstPayment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 {product.paymentType === 'recurring' && (
-                    <p className="text-xs text-cyan-400 mt-1">
-                        (Primeira mensalidade {product.setupFee ? '+ Taxa de Adesão' : ''})
+                    <p className="text-[10px] text-cyan-400 mt-1">
+                        (Mensalidade + Taxas inclusas)
                     </p>
                 )}
               </div>
               
-              <div className="bg-white p-4 rounded-xl mx-auto inline-block mb-8 shadow-xl">
-                 <QRCode value={config.pix.key} size={180} />
+              {/* QR CODE GENERADO COM VALOR */}
+              <div className="bg-white p-3 rounded-xl mx-auto inline-block mb-6 shadow-xl relative group">
+                 <div className="absolute inset-0 border-4 border-cyan-500/0 group-hover:border-cyan-500/100 transition-colors rounded-xl pointer-events-none"></div>
+                 <QRCode value={pixPayload} size={160} />
               </div>
               
               <div className="space-y-3 mb-6">
-                <div className="bg-gray-800 rounded-xl p-4 flex items-center justify-between group cursor-pointer hover:bg-gray-750 border border-gray-700 hover:border-cyan-500/50 transition-colors" onClick={() => navigator.clipboard.writeText(config.pix.key)}>
-                  <div className="text-left overflow-hidden">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Chave PIX ({config.pix.keyType})</p>
-                    <code className="text-cyan-400 font-mono text-sm truncate block">{config.pix.key}</code>
-                  </div>
-                  <span className="text-xs font-bold text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700 group-hover:text-white">COPIAR</span>
+                {/* COPIA E COLA BOX */}
+                <div className="bg-gray-800 rounded-xl p-3 flex flex-col gap-2 border border-gray-700 hover:border-cyan-500/50 transition-colors group">
+                   <div className="flex justify-between items-center">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-yellow-400" /> Código Copia e Cola
+                        </p>
+                        <span className="text-[10px] bg-cyan-900/30 text-cyan-400 px-2 py-0.5 rounded border border-cyan-500/20">
+                            Valor já incluso
+                        </span>
+                   </div>
+                   
+                   <div className="relative">
+                        <textarea 
+                            readOnly 
+                            value={pixPayload}
+                            className="w-full bg-gray-900 text-gray-400 text-[10px] font-mono p-2 rounded border border-gray-800 h-16 resize-none focus:outline-none focus:border-cyan-500 custom-scrollbar"
+                        />
+                   </div>
+
+                   <button 
+                    onClick={handleCopyPix}
+                    className={`w-full py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                        copyFeedback 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-cyan-600 hover:bg-cyan-500 text-white'
+                    }`}
+                   >
+                     {copyFeedback ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                     {copyFeedback ? 'CÓDIGO COPIADO!' : 'COPIAR CÓDIGO PIX'}
+                   </button>
                 </div>
 
-                <div className="bg-gray-800/50 rounded-xl p-4 text-left border border-gray-800">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Beneficiário</p>
-                  <p className="text-white font-medium text-sm">{config.pix.beneficiary}</p>
+                <div className="bg-gray-800/50 rounded-xl p-3 text-left border border-gray-800 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Beneficiário</p>
+                    <p className="text-white font-medium text-xs truncate max-w-[200px]">{config.pix.beneficiary}</p>
+                  </div>
+                   <div className="text-right">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Banco</p>
+                    <p className="text-white font-medium text-xs">PSP</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-gray-800/80 p-4 rounded-xl border border-gray-700 mb-4 text-left">
-                 <p className="text-sm font-bold text-white mb-2 text-center">Confirmar Pagamento</p>
-                 <label className="text-xs text-gray-400 block mb-1">Seu Nome</label>
-                 <input 
-                   type="text" 
-                   value={customerName}
-                   onChange={(e) => setCustomerName(e.target.value)}
-                   className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white text-sm mb-3 focus:border-green-500 focus:outline-none"
-                 />
-                 <label className="text-xs text-gray-400 block mb-1">Seu WhatsApp</label>
-                  <input 
-                   type="text" 
-                   value={whatsappContact}
-                   onChange={(e) => setWhatsappContact(e.target.value)}
-                   className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white text-sm mb-3 focus:border-green-500 focus:outline-none"
-                   placeholder="(00) 00000-0000"
-                 />
+              <div className="bg-gray-800/80 p-4 rounded-xl border border-gray-700 mb-2 text-left">
+                 <p className="text-xs font-bold text-white mb-3 text-center uppercase tracking-wide border-b border-gray-700 pb-2">Confirmar e Ativar</p>
+                 
+                 <div className="space-y-3">
+                    <div>
+                        <label className="text-[10px] text-gray-400 block mb-1 font-bold">SEU NOME</label>
+                        <input 
+                        type="text" 
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white text-sm focus:border-green-500 focus:outline-none transition-colors"
+                        placeholder="Nome completo"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] text-gray-400 block mb-1 font-bold">SEU WHATSAPP</label>
+                        <input 
+                        type="tel" 
+                        value={whatsappContact}
+                        onChange={(e) => setWhatsappContact(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-600 rounded-lg p-2.5 text-white text-sm focus:border-green-500 focus:outline-none transition-colors"
+                        placeholder="(00) 00000-0000"
+                        />
+                    </div>
+                 </div>
+                 
                  <button 
                     onClick={handleSendProof}
-                    className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all mt-4 hover:scale-[1.02] shadow-lg shadow-green-900/20"
                  >
                     <Send className="w-4 h-4" /> Enviar Comprovante
                  </button>

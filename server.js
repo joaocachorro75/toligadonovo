@@ -306,7 +306,7 @@ const sendEvolutionMessage = async (to, text) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': config.apiKey
+                'apikey': config.apiKey // Evolution v2 uses 'apikey' header with instance token
             },
             body: JSON.stringify(body)
         });
@@ -507,6 +507,36 @@ app.post('/api/evolution/test', async (req, res) => {
   
   if (success) res.json({ success: true });
   else res.status(500).json({ error: 'Failed to send message' });
+});
+
+// Check Evolution Status
+app.get('/api/evolution/status', async (req, res) => {
+    const db = loadDB();
+    const config = db.config.evolution;
+
+    if (!config || !config.baseUrl || !config.instanceName) {
+        return res.json({ status: 'not_configured' });
+    }
+
+    try {
+        const url = `${config.baseUrl}/instance/connectionState/${config.instanceName}`;
+        const response = await fetch(url, {
+            headers: { 'apikey': config.apiKey }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            // Expected: { instance: { state: "open" } } or { instance: "name", state: "open" } depending on version
+            // Adapting for generic response check
+            const state = data?.instance?.state || data?.state || 'unknown';
+            res.json({ status: state });
+        } else {
+            res.json({ status: 'error', details: await response.text() });
+        }
+    } catch (e) {
+        console.error("Evolution Status Check Failed", e);
+        res.json({ status: 'error' });
+    }
 });
 
 app.post('/api/upload', upload.single('image'), (req, res) => {

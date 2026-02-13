@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../../services/db';
 import { Lead, Product, SiteConfig, Order, BlogPost } from '../../types';
-import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send } from 'lucide-react';
+import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ImageUpload } from '../../components/ImageUpload';
 import { INITIAL_SITE_CONFIG } from '../../services/initialData';
@@ -33,6 +33,9 @@ export const AdminDashboard: React.FC = () => {
   // Test Message State
   const [testPhone, setTestPhone] = useState('');
   const [testSending, setTestSending] = useState(false);
+  
+  // Connection Status State
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'open' | 'close' | 'error' | null>(null);
 
   // Editing States
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -217,6 +220,15 @@ export const AdminDashboard: React.FC = () => {
   const handleSaveConfig = async () => {
     await db.saveConfig(config);
     alert('Configurações salvas!');
+  };
+  
+  const handleCheckConnection = async () => {
+      setConnectionStatus('checking');
+      const status = await db.checkEvolutionStatus();
+      // Evolution standard 'open' means connected
+      if (status === 'open') setConnectionStatus('open');
+      else if (status === 'close') setConnectionStatus('close');
+      else setConnectionStatus('error');
   };
 
   const handleTestEvolution = async () => {
@@ -619,10 +631,25 @@ export const AdminDashboard: React.FC = () => {
        <section className="bg-gray-800 border-2 border-green-500/30 rounded-xl p-4 md:p-8 space-y-6 shadow-lg shadow-green-900/20">
          <div className="flex items-center gap-3 border-b border-gray-700 pb-4 mb-4">
             <MessageSquare className="w-8 h-8 text-green-500 flex-shrink-0" />
-            <div>
+            <div className="flex-1">
                  <h3 className="text-xl font-bold text-white">Automação WhatsApp</h3>
                  <p className="text-xs text-gray-400">Evolution API Config</p>
             </div>
+            {connectionStatus === 'open' && (
+                <div className="flex items-center gap-1 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30">
+                    <Wifi className="w-3 h-3" /> Conectado
+                </div>
+            )}
+            {connectionStatus === 'close' && (
+                <div className="flex items-center gap-1 bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-xs font-bold border border-red-500/30">
+                    <WifiOff className="w-3 h-3" /> Desconectado
+                </div>
+            )}
+             {connectionStatus === 'error' && (
+                <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold border border-yellow-500/30">
+                    <X className="w-3 h-3" /> Erro API
+                </div>
+            )}
          </div>
          
          <div className="flex items-center gap-4 mb-4">
@@ -655,19 +682,31 @@ export const AdminDashboard: React.FC = () => {
              />
            </div>
            <div>
-             <label className="block text-sm font-medium text-gray-400 mb-1">API Key (Token)</label>
+             <label className="block text-sm font-medium text-gray-400 mb-1">Token da Instância (API Key)</label>
              <input
                type="password"
                value={config.evolution?.apiKey || ''}
                onChange={e => setConfig({...config, evolution: { ...config.evolution!, apiKey: e.target.value }})}
                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
-               placeholder="Token da API"
+               placeholder="Token da Instância"
              />
+             <p className="text-[10px] text-gray-500 mt-1">Use a API Key específica da Instância, não a Global.</p>
+           </div>
+           
+           <div className="flex gap-4">
+                <button 
+                    onClick={handleCheckConnection}
+                    disabled={connectionStatus === 'checking'}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                >
+                    <RefreshCw className={`w-4 h-4 ${connectionStatus === 'checking' ? 'animate-spin' : ''}`} /> 
+                    {connectionStatus === 'checking' ? 'Verificando...' : 'Verificar Conexão'}
+                </button>
            </div>
            
            {/* TEST MESSAGE BLOCK */}
            <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mt-4">
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Testar Conexão</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Testar Envio de Mensagem</label>
               <div className="flex gap-2">
                   <input 
                       type="text" 
@@ -684,7 +723,6 @@ export const AdminDashboard: React.FC = () => {
                      <Send className="w-4 h-4" /> {testSending ? 'Enviando...' : 'Testar'}
                   </button>
               </div>
-              <p className="text-[10px] text-gray-500 mt-2">Envia uma mensagem de teste para verificar se a API está respondendo.</p>
            </div>
            
            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">

@@ -357,6 +357,19 @@ export const db = {
       }
   },
 
+  checkEvolutionStatus: async (): Promise<string> => {
+      try {
+          const res = await fetchWithTimeout(`${BASE_URL}/evolution/status`);
+          if (res.ok) {
+              const data = await res.json();
+              return data.status || 'error';
+          }
+          return 'error';
+      } catch (e) {
+          return 'error';
+      }
+  },
+
   // --- CONFIG ---
   getConfig: async (): Promise<SiteConfig> => {
     const online = await api.get('/config');

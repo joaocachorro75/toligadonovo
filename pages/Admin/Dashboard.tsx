@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../../services/db';
-import { Lead, Product, SiteConfig, Order } from '../../types';
-import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings } from 'lucide-react';
+import { Lead, Product, SiteConfig, Order, BlogPost } from '../../types';
+import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send } from 'lucide-react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ImageUpload } from '../../components/ImageUpload';
 import { INITIAL_SITE_CONFIG } from '../../services/initialData';
@@ -13,8 +14,8 @@ export const AdminDashboard: React.FC = () => {
 
   const getTabFromPath = () => {
     const path = location.pathname.split('/').pop();
-    if (path === 'leads' || path === 'orders' || path === 'content' || path === 'settings') {
-      return path as 'leads' | 'orders' | 'content' | 'settings';
+    if (['leads', 'orders', 'content', 'settings', 'blog'].includes(path || '')) {
+      return path as 'leads' | 'orders' | 'content' | 'settings' | 'blog';
     }
     return 'leads';
   };
@@ -25,11 +26,17 @@ export const AdminDashboard: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [posts, setPosts] = useState<BlogPost[]>([]);
   const [config, setConfig] = useState<SiteConfig>(INITIAL_SITE_CONFIG);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Test Message State
+  const [testPhone, setTestPhone] = useState('');
+  const [testSending, setTestSending] = useState(false);
 
   // Editing States
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [editingPost, setEditingPost] = useState<Partial<BlogPost> | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -38,16 +45,18 @@ export const AdminDashboard: React.FC = () => {
 
   const refreshData = async () => {
     try {
-        const [l, p, c, o] = await Promise.all([
+        const [l, p, c, o, postsData] = await Promise.all([
             db.getLeads(),
             db.getProducts(),
             db.getConfig(),
-            db.getOrders()
+            db.getOrders(),
+            db.getPosts()
         ]);
         setLeads(l);
         setProducts(p);
         setConfig(c || INITIAL_SITE_CONFIG);
         setOrders(o);
+        setPosts(postsData);
     } catch (e) {
         console.error("Error loading admin data", e);
     }
@@ -83,14 +92,24 @@ export const AdminDashboard: React.FC = () => {
     refreshData();
   };
 
+  const handleSendReminder = async (order: Order) => {
+      if (!confirm(`Enviar lembrete de pagamento para ${order.customerName}?`)) return;
+      
+      const success = await db.sendPaymentReminder(order.id);
+      if (success) alert("Mensagem enviada com sucesso!");
+      else alert("Erro ao enviar mensagem. Verifique a configuração da Evolution API.");
+  };
+
   // --- Product Actions ---
-  const handleStartCreate = () => {
+  const handleStartCreateProduct = () => {
     setIsCreating(true);
     setEditingProduct({
       title: '',
       menuTitle: '',
       slug: '',
       price: 0,
+      paymentType: 'one-time',
+      setupFee: 0,
       shortDescription: '',
       fullDescription: '',
       ctaText: 'Comprar',
@@ -113,6 +132,10 @@ export const AdminDashboard: React.FC = () => {
         alert('Título e Slug são obrigatórios');
         return;
       }
+
+      const prodData = editingProduct as any;
+      // Default fallback
+      if (!prodData.paymentType) prodData.paymentType = 'one-time';
 
       if (isCreating) {
         await db.createProduct(editingProduct as Omit<Product, 'id'>);
@@ -148,10 +171,65 @@ export const AdminDashboard: React.FC = () => {
     setEditingProduct({ ...editingProduct, features: newFeatures });
   };
 
+  // --- Blog Actions ---
+  const handleStartCreatePost = () => {
+    setIsCreating(true);
+    setEditingPost({
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      coverImage: '',
+      published: true
+    });
+  };
+
+  const handleDeletePost = async (id: string) => {
+    if (confirm('Excluir este post?')) {
+      await db.deletePost(id);
+      refreshData();
+    }
+  };
+
+  const handleSavePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingPost) {
+      if (!editingPost.title || !editingPost.content) {
+        alert('Título e conteúdo são obrigatórios');
+        return;
+      }
+      if (!editingPost.slug) {
+         editingPost.slug = editingPost.title.toLowerCase().replace(/[^\w ]+/g,'').replace(/ +/g,'-');
+      }
+
+      if (isCreating) {
+        await db.createPost(editingPost as any);
+      } else {
+        await db.updatePost(editingPost as BlogPost);
+      }
+      setEditingPost(null);
+      setIsCreating(false);
+      refreshData();
+    }
+  };
+
   // --- Config Actions ---
   const handleSaveConfig = async () => {
     await db.saveConfig(config);
     alert('Configurações salvas!');
+  };
+
+  const handleTestEvolution = async () => {
+      if (!testPhone) {
+          alert("Digite um número para testar");
+          return;
+      }
+      setTestSending(true);
+      const success = await db.sendTestMessage(testPhone);
+      setTestSending(false);
+      
+      if (success) alert("Mensagem de teste enviada com sucesso! Verifique o WhatsApp.");
+      else alert("Falha ao enviar. Verifique a URL, Instância e Token da API.");
   };
 
   // --- Formatters ---
@@ -167,21 +245,21 @@ export const AdminDashboard: React.FC = () => {
     );
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-white">Gestão de Leads</h2>
-          <div className="relative">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-xl md:text-2xl font-bold text-white">Gestão de Leads</h2>
+          <div className="relative w-full md:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
             <input 
               type="text" 
               placeholder="Buscar..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none w-64"
+              className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none w-full md:w-64"
             />
           </div>
         </div>
-        <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-400">
+        <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-400 min-w-[800px]">
             <thead className="bg-gray-900 text-gray-200">
               <tr>
                 <th className="px-6 py-4">Nome</th>
@@ -225,14 +303,14 @@ export const AdminDashboard: React.FC = () => {
   const renderOrders = () => {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-white">Vendas & Pedidos</h2>
-        <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-400">
+        <h2 className="text-xl md:text-2xl font-bold text-white">Vendas & Assinaturas</h2>
+        <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-400 min-w-[800px]">
             <thead className="bg-gray-900 text-gray-200">
               <tr>
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Produto</th>
-                <th className="px-6 py-4">Valor</th>
+                <th className="px-6 py-4">Tipo</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Ações</th>
               </tr>
@@ -246,16 +324,29 @@ export const AdminDashboard: React.FC = () => {
                        <Phone className="w-3 h-3" /> {formatPhone(order.customerWhatsapp)}
                     </a>
                   </td>
-                  <td className="px-6 py-4">{order.productTitle}</td>
-                  <td className="px-6 py-4 text-cyan-400 font-bold">R$ {order.productPrice}</td>
                   <td className="px-6 py-4">
-                    <select value={order.status} onChange={(e) => handleUpdateOrderStatus(order, e.target.value as any)} className={`bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-bold ${order.status === 'approved' ? 'text-green-400' : 'text-yellow-400'}`}>
+                    <div className="text-white">{order.productTitle}</div>
+                    <div className="text-xs text-cyan-400">R$ {order.productPrice} {order.billingCycle ? '/ ' + (order.billingCycle === 'monthly' ? 'mês' : 'ano') : ''}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {order.isSubscription ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-900/30 text-purple-400 text-xs border border-purple-500/30">
+                            <RefreshCcw className="w-3 h-3" /> Recorrente
+                        </span>
+                    ) : (
+                        <span className="px-2 py-1 rounded-full bg-gray-700 text-gray-300 text-xs">Único</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <select value={order.status} onChange={(e) => handleUpdateOrderStatus(order, e.target.value as any)} className={`bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-bold ${order.status === 'active' || order.status === 'approved' ? 'text-green-400' : order.status === 'cancelled' ? 'text-red-400' : 'text-yellow-400'}`}>
                       <option value="pending">Pendente</option>
-                      <option value="approved">Aprovado</option>
+                      <option value="active">Ativo (Assinatura)</option>
+                      <option value="approved">Aprovado (Venda)</option>
                       <option value="cancelled">Cancelado</option>
                     </select>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 flex gap-2">
+                    <button title="Enviar Lembrete WhatsApp" onClick={() => handleSendReminder(order)} className="p-2 text-green-400 hover:bg-green-900/30 rounded border border-green-900/50"><Bell className="w-4 h-4" /></button>
                     <button onClick={() => handleDeleteOrder(order.id)} className="p-2 text-red-400 hover:bg-red-900/30 rounded"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
@@ -268,19 +359,93 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  const renderBlog = () => (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl md:text-2xl font-bold text-white">Dicas & Blog</h2>
+        {!editingPost && (
+          <button onClick={handleStartCreatePost} className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base">
+            <Plus className="w-5 h-5" /> <span className="hidden md:inline">Nova Dica</span>
+          </button>
+        )}
+      </div>
+
+      {editingPost ? (
+        <form onSubmit={handleSavePost} className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-6 space-y-6">
+           <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
+            <h3 className="text-xl font-bold text-white">{isCreating ? 'Nova Publicação' : 'Editar Publicação'}</h3>
+            <button type="button" onClick={() => { setEditingPost(null); setIsCreating(false); }} className="text-gray-400 hover:text-white">Cancelar</button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+               <ImageUpload 
+                 label="Imagem de Capa"
+                 currentImage={editingPost.coverImage}
+                 onImageChange={(url) => setEditingPost({ ...editingPost, coverImage: url })}
+               />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-400 mb-1">Título</label>
+              <input value={editingPost.title} onChange={e => setEditingPost({...editingPost, title: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
+            </div>
+             <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-400 mb-1">Slug (URL Amigável - Deixe vazio para gerar auto)</label>
+              <input value={editingPost.slug} onChange={e => setEditingPost({...editingPost, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-400 mb-1">Resumo (Excerpt)</label>
+              <textarea value={editingPost.excerpt} onChange={e => setEditingPost({...editingPost, excerpt: e.target.value})} rows={2} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-400 mb-1">Conteúdo (Pode usar HTML básico)</label>
+              <textarea value={editingPost.content} onChange={e => setEditingPost({...editingPost, content: e.target.value})} rows={15} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white font-mono text-sm" />
+            </div>
+          </div>
+           <div className="flex justify-end pt-4">
+            <button type="submit" className="w-full md:w-auto bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+              <Save className="w-4 h-4" /> Salvar Post
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {posts.map(post => (
+             <div key={post.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 group hover:border-cyan-500/50">
+               <div className="flex items-center gap-4 w-full">
+                 <div className="w-16 h-16 bg-gray-900 rounded overflow-hidden flex-shrink-0">
+                   <img src={post.coverImage} className="w-full h-full object-cover" />
+                 </div>
+                 <div className="min-w-0">
+                   <h4 className="text-white font-bold truncate">{post.title}</h4>
+                   <p className="text-xs text-gray-500 truncate">{post.slug}</p>
+                 </div>
+               </div>
+               <div className="flex gap-2 w-full sm:w-auto justify-end">
+                  <button onClick={() => { setEditingPost(post); setIsCreating(false); }} className="p-2 bg-gray-700 text-white rounded hover:bg-cyan-600"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleDeletePost(post.id)} className="p-2 bg-red-900/20 text-red-400 rounded hover:bg-red-900"><Trash2 className="w-4 h-4" /></button>
+               </div>
+             </div>
+          ))}
+          {posts.length === 0 && <div className="text-gray-500 text-center py-10">Nenhuma dica postada ainda.</div>}
+        </div>
+      )}
+    </div>
+  );
+
   const renderContent = () => (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-white">Páginas e Produtos</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-white">Páginas e Produtos</h2>
         {!editingProduct && (
-          <button onClick={handleStartCreate} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-            <Plus className="w-5 h-5" /> Novo Produto
+          <button onClick={handleStartCreateProduct} className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold flex items-center gap-2 text-sm md:text-base">
+            <Plus className="w-5 h-5" /> <span className="hidden md:inline">Novo Produto</span>
           </button>
         )}
       </div>
       
       {editingProduct ? (
-        <form onSubmit={handleSaveProduct} className="bg-gray-800 border border-gray-700 rounded-xl p-6 space-y-6">
+        <form onSubmit={handleSaveProduct} className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-6 space-y-6">
           <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
             <h3 className="text-xl font-bold text-white">{isCreating ? 'Criar Novo Produto' : `Editando: ${editingProduct.title}`}</h3>
             <button type="button" onClick={() => { setEditingProduct(null); setIsCreating(false); }} className="text-gray-400 hover:text-white">Cancelar</button>
@@ -303,14 +468,54 @@ export const AdminDashboard: React.FC = () => {
               <label className="block text-sm font-medium text-gray-400 mb-1">Título do Menu</label>
               <input value={editingProduct.menuTitle} onChange={e => setEditingProduct({...editingProduct, menuTitle: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required placeholder="Ex: Zap Marketing" />
             </div>
+            
+            {/* PRICING & SUBSCRIPTION CONFIG */}
+            <div className="md:col-span-2 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+               <h4 className="text-cyan-400 font-bold mb-4 flex items-center gap-2"><Settings className="w-4 h-4" /> Configuração de Preço e Cobrança</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Tipo de Cobrança</label>
+                    <select 
+                      value={editingProduct.paymentType || 'one-time'} 
+                      onChange={e => setEditingProduct({...editingProduct, paymentType: e.target.value as any})}
+                      className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                    >
+                      <option value="one-time">Pagamento Único (Venda)</option>
+                      <option value="recurring">Assinatura (Recorrente)</option>
+                    </select>
+                  </div>
+                   <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Preço (R$)</label>
+                    <input type="number" step="0.01" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
+                  </div>
+
+                  {editingProduct.paymentType === 'recurring' && (
+                    <>
+                       <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Ciclo de Cobrança</label>
+                        <select 
+                          value={editingProduct.billingCycle || 'monthly'} 
+                          onChange={e => setEditingProduct({...editingProduct, billingCycle: e.target.value as any})}
+                          className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
+                        >
+                          <option value="monthly">Mensal</option>
+                          <option value="yearly">Anual</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Taxa de Adesão (Setup) - Opcional</label>
+                        <input type="number" step="0.01" value={editingProduct.setupFee || 0} onChange={e => setEditingProduct({...editingProduct, setupFee: parseFloat(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+                      </div>
+                    </>
+                  )}
+               </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Slug (URL)</label>
               <input value={editingProduct.slug} onChange={e => setEditingProduct({...editingProduct, slug: e.target.value.toLowerCase().replace(/\s+/g, '-')})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required placeholder="ex: zap-marketing" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Preço (R$)</label>
-              <input type="number" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" required />
-            </div>
+            
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-400 mb-1">Descrição Curta (Resumo)</label>
               <input value={editingProduct.shortDescription} onChange={e => setEditingProduct({...editingProduct, shortDescription: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" placeholder="Aparece nos cards e no subtítulo da página." />
@@ -346,7 +551,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="flex justify-end pt-4">
-            <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
+            <button type="submit" className="w-full md:w-auto bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center gap-2">
               <Save className="w-4 h-4" /> Salvar Produto
             </button>
           </div>
@@ -362,8 +567,18 @@ export const AdminDashboard: React.FC = () => {
                 <div className="w-full h-32 bg-gray-900 rounded-lg mb-4 overflow-hidden border border-gray-700">
                   <img src={product.heroImage} alt={product.title} className="w-full h-full object-cover" />
                 </div>
-                <p className="text-xs text-cyan-400 font-bold uppercase mb-2">Menu: {product.menuTitle}</p>
-                <div className="text-white font-bold text-xl mb-4">R$ {product.price}</div>
+                <div className="flex justify-between items-end mb-4">
+                    <div>
+                         <p className="text-xs text-gray-500 uppercase font-bold">Preço</p>
+                         <div className="text-white font-bold text-xl">R$ {product.price}</div>
+                    </div>
+                    {product.paymentType === 'recurring' && (
+                        <div className="text-right">
+                            <p className="text-xs text-purple-400 uppercase font-bold">Assinatura</p>
+                            <p className="text-xs text-gray-400">{product.billingCycle === 'monthly' ? 'Mensal' : 'Anual'}</p>
+                        </div>
+                    )}
+                </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <button 
@@ -398,19 +613,219 @@ export const AdminDashboard: React.FC = () => {
     if (!config || !config.home || !config.pix) return <div className="text-white">Carregando configurações...</div>;
 
     return (
-    <div className="max-w-2xl space-y-12">
-      {/* WHATSAPP CONFIG SECTION */}
-      <section className="bg-gray-800 border-2 border-green-500/30 rounded-xl p-8 space-y-6 shadow-lg shadow-green-900/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-           <Phone className="w-24 h-24 text-green-500" />
+    <div className="max-w-2xl space-y-12 pb-20">
+
+       {/* Evolution API Section */}
+       <section className="bg-gray-800 border-2 border-green-500/30 rounded-xl p-4 md:p-8 space-y-6 shadow-lg shadow-green-900/20">
+         <div className="flex items-center gap-3 border-b border-gray-700 pb-4 mb-4">
+            <MessageSquare className="w-8 h-8 text-green-500 flex-shrink-0" />
+            <div>
+                 <h3 className="text-xl font-bold text-white">Automação WhatsApp</h3>
+                 <p className="text-xs text-gray-400">Evolution API Config</p>
+            </div>
+         </div>
+         
+         <div className="flex items-center gap-4 mb-4">
+            <label className="text-sm text-gray-300 font-bold">Status:</label>
+            <button 
+                onClick={() => setConfig({ ...config, evolution: { ...config.evolution!, enabled: !config.evolution?.enabled } })}
+                className={`px-4 py-1 rounded-full text-xs font-bold transition-colors ${config.evolution?.enabled ? 'bg-green-600 text-white' : 'bg-red-900/50 text-red-400'}`}
+            >
+                {config.evolution?.enabled ? 'ATIVADO' : 'DESATIVADO'}
+            </button>
+         </div>
+
+         <div className="space-y-4">
+            <div>
+             <label className="block text-sm font-medium text-gray-400 mb-1">URL da API (Evolution)</label>
+             <input
+               value={config.evolution?.baseUrl || ''}
+               onChange={e => setConfig({...config, evolution: { ...config.evolution!, baseUrl: e.target.value }})}
+               className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none placeholder-gray-600"
+               placeholder="https://api.meudominio.com"
+             />
+           </div>
+           <div>
+             <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Instância</label>
+             <input
+               value={config.evolution?.instanceName || ''}
+               onChange={e => setConfig({...config, evolution: { ...config.evolution!, instanceName: e.target.value }})}
+               className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+               placeholder="MinhaInstancia"
+             />
+           </div>
+           <div>
+             <label className="block text-sm font-medium text-gray-400 mb-1">API Key (Token)</label>
+             <input
+               type="password"
+               value={config.evolution?.apiKey || ''}
+               onChange={e => setConfig({...config, evolution: { ...config.evolution!, apiKey: e.target.value }})}
+               className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+               placeholder="Token da API"
+             />
+           </div>
+           
+           {/* TEST MESSAGE BLOCK */}
+           <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mt-4">
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Testar Conexão</label>
+              <div className="flex gap-2">
+                  <input 
+                      type="text" 
+                      value={testPhone}
+                      onChange={(e) => setTestPhone(e.target.value)}
+                      placeholder="5591999999999"
+                      className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-green-500"
+                  />
+                  <button 
+                      onClick={handleTestEvolution}
+                      disabled={testSending}
+                      className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+                  >
+                     <Send className="w-4 h-4" /> {testSending ? 'Enviando...' : 'Testar'}
+                  </button>
+              </div>
+              <p className="text-[10px] text-gray-500 mt-2">Envia uma mensagem de teste para verificar se a API está respondendo.</p>
+           </div>
+           
+           <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Mensagem de Boas-vindas</label>
+                <textarea
+                    rows={2}
+                    value={config.evolution?.welcomeMessage || ''}
+                    onChange={e => setConfig({...config, evolution: { ...config.evolution!, welcomeMessage: e.target.value }})}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">Variáveis: {'{cliente}'}, {'{produto}'}</p>
+           </div>
+           <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Mensagem de Cobrança</label>
+                <textarea
+                    rows={2}
+                    value={config.evolution?.reminderMessage || ''}
+                    onChange={e => setConfig({...config, evolution: { ...config.evolution!, reminderMessage: e.target.value }})}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">Variáveis: {'{cliente}'}, {'{produto}'}</p>
+           </div>
+         </div>
+       </section>
+
+      {/* Identity Section */}
+      <section className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-8 space-y-6">
+        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4 flex items-center gap-2">
+           <Layout className="w-6 h-6 text-purple-400" /> Identidade Visual
+        </h3>
+        <div className="space-y-4">
+           <div>
+             <label className="block text-sm font-medium text-gray-400 mb-1">Nome do Site (Logo em Texto)</label>
+             <input
+               value={config.logoText}
+               onChange={e => setConfig({...config, logoText: e.target.value})}
+               className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+             />
+           </div>
+           <div className="pt-2">
+             <ImageUpload
+               label="Logo (Imagem Opcional)"
+               currentImage={config.logoImage}
+               onImageChange={(url) => setConfig({ ...config, logoImage: url })}
+             />
+           </div>
         </div>
+      </section>
+
+      {/* Home Page Texts Section */}
+      <section className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-8 space-y-6">
+        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4 flex items-center gap-2">
+           <Newspaper className="w-6 h-6 text-cyan-400" /> Textos da Home
+        </h3>
+        
+        <div className="space-y-6">
+            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                <h4 className="text-cyan-400 font-bold mb-4 text-sm uppercase tracking-wider">Seção Hero (Topo)</h4>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Título Principal</label>
+                        <input
+                        value={config.home.heroTitle}
+                        onChange={e => setConfig({...config, home: { ...config.home, heroTitle: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Texto Destaque (Colorido)</label>
+                        <input
+                        value={config.home.heroHighlight}
+                        onChange={e => setConfig({...config, home: { ...config.home, heroHighlight: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Descrição do Topo</label>
+                        <textarea
+                        rows={3}
+                        value={config.home.heroDescription}
+                        onChange={e => setConfig({...config, home: { ...config.home, heroDescription: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                <h4 className="text-cyan-400 font-bold mb-4 text-sm uppercase tracking-wider">Seção de Serviços</h4>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Título da Seção</label>
+                        <input
+                        value={config.home.servicesTitle}
+                        onChange={e => setConfig({...config, home: { ...config.home, servicesTitle: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Subtítulo / Descrição</label>
+                        <textarea
+                        rows={2}
+                        value={config.home.servicesDescription}
+                        onChange={e => setConfig({...config, home: { ...config.home, servicesDescription: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                </div>
+            </div>
+
+             <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700/50">
+                <h4 className="text-cyan-400 font-bold mb-4 text-sm uppercase tracking-wider">Seção de Contato</h4>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Título de Chamada</label>
+                        <input
+                        value={config.home.contactTitle}
+                        onChange={e => setConfig({...config, home: { ...config.home, contactTitle: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Texto de Incentivo</label>
+                        <textarea
+                        rows={2}
+                        value={config.home.contactDescription}
+                        onChange={e => setConfig({...config, home: { ...config.home, contactDescription: e.target.value }})}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+      </section>
+
+       {/* WhatsApp Section */}
+       <section className="bg-gray-800 border-2 border-green-500/30 rounded-xl p-4 md:p-8 space-y-6 shadow-lg shadow-green-900/20 relative overflow-hidden">
         <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4 flex items-center gap-2">
            <Phone className="w-6 h-6 text-green-400" />
            WhatsApp & Contato
         </h3>
-        <p className="text-sm text-gray-400 mb-4">
-          Este número será usado para o botão flutuante, recebimento de leads e envio de comprovantes de PIX.
-        </p>
         <div>
           <label className="block text-sm font-medium text-green-400 mb-1 font-bold">Número do WhatsApp (Com DDD)</label>
           <input 
@@ -422,122 +837,12 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </section>
 
-      {/* Branding Section */}
-      <section className="bg-gray-800 border border-gray-700 rounded-xl p-8 space-y-6">
-        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4">Identidade Visual</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="md:col-span-2">
-            <ImageUpload 
-               label="Logomarca (Substitui o Texto)"
-               currentImage={config.logoImage}
-               onImageChange={(url) => setConfig({ ...config, logoImage: url })}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Nome da Empresa (Texto)</label>
-            <input 
-              value={config.logoText}
-              onChange={e => setConfig({...config, logoText: e.target.value})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Cor Principal (Hex)</label>
-            <div className="flex gap-2">
-               <input 
-                type="color"
-                value={config.logoColor}
-                onChange={e => setConfig({...config, logoColor: e.target.value})}
-                className="h-10 w-10 rounded cursor-pointer bg-transparent"
-              />
-              <input 
-                value={config.logoColor}
-                onChange={e => setConfig({...config, logoColor: e.target.value})}
-                className="flex-1 bg-gray-900 border border-gray-700 rounded p-2 text-white font-mono uppercase"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Home Page Content Section */}
-      <section className="bg-gray-800 border border-gray-700 rounded-xl p-8 space-y-6">
-        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4">Textos da Página Inicial</h3>
-        
-        <div className="space-y-4">
-          <h4 className="font-bold text-cyan-400 text-sm uppercase tracking-wider">Hero Section (Topo)</h4>
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Título Principal</label>
-            <input 
-              value={config.home?.heroTitle || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, heroTitle: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Destaque Colorido</label>
-            <input 
-              value={config.home?.heroHighlight || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, heroHighlight: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Descrição</label>
-            <textarea 
-              value={config.home?.heroDescription || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, heroDescription: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-              rows={3}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-gray-700">
-           <h4 className="font-bold text-cyan-400 text-sm uppercase tracking-wider">Seção de Serviços</h4>
-           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Título</label>
-            <input 
-              value={config.home?.servicesTitle || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, servicesTitle: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Descrição</label>
-            <input 
-              value={config.home?.servicesDescription || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, servicesDescription: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-gray-700">
-           <h4 className="font-bold text-cyan-400 text-sm uppercase tracking-wider">Seção de Contato</h4>
-           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Título</label>
-            <input 
-              value={config.home?.contactTitle || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, contactTitle: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Descrição</label>
-            <input 
-              value={config.home?.contactDescription || ''}
-              onChange={e => setConfig({...config, home: { ...config.home, contactDescription: e.target.value }})}
-              className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"
-            />
-          </div>
-        </div>
-      </section>
-
       {/* PIX Section */}
-      <section className="bg-gray-800 border border-gray-700 rounded-xl p-8 space-y-6">
-        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4">Pagamento (PIX)</h3>
+      <section className="bg-gray-800 border border-gray-700 rounded-xl p-4 md:p-8 space-y-6">
+        <h3 className="text-xl font-bold text-white border-b border-gray-700 pb-4 mb-4 flex items-center gap-2">
+            <ShoppingBag className="w-6 h-6 text-yellow-400" />
+            Pagamento (PIX)
+        </h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Tipo de Chave</label>
@@ -576,7 +881,7 @@ export const AdminDashboard: React.FC = () => {
         onClick={handleSaveConfig}
         className="sticky bottom-6 w-full bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-xl font-bold shadow-lg transition-all text-lg border border-cyan-500/50"
       >
-        Salvar Todas as Configurações
+        Salvar Configurações
       </button>
     </div>
   )};
@@ -586,6 +891,7 @@ export const AdminDashboard: React.FC = () => {
       {activeTab === 'leads' && renderLeads()}
       {activeTab === 'orders' && renderOrders()}
       {activeTab === 'content' && renderContent()}
+      {activeTab === 'blog' && renderBlog()}
       {activeTab === 'settings' && renderSettings()}
     </AdminLayout>
   );

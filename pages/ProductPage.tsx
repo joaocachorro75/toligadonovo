@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Product, SiteConfig } from '../types';
 import { LeadForm } from '../components/LeadForm';
-import { ArrowLeft, Check, Zap, ShoppingBag, X, ShieldCheck, Clock, Award, Send } from 'lucide-react';
+import { ArrowLeft, Check, Zap, ShoppingBag, X, ShieldCheck, Clock, Award, Send, RefreshCcw } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { FloatingWhatsApp } from '../components/FloatingWhatsApp';
 
@@ -45,22 +45,44 @@ export const ProductPage: React.FC = () => {
   const handleSendProof = async () => {
     if (!config.whatsapp) return;
     
-    // 1. Save Order to Admin
+    // Save Order to Admin
     await db.addOrder(
       product.title,
       product.price,
       customerName || 'Cliente Anônimo',
-      whatsappContact || 'Não informado'
+      whatsappContact || 'Não informado',
+      {
+         isSubscription: product.paymentType === 'recurring',
+         billingCycle: product.billingCycle,
+         setupFee: product.setupFee
+      }
     );
 
-    // 2. Open WhatsApp
+    // Open WhatsApp
     const cleaned = config.whatsapp.replace(/\D/g, '');
     const namePart = customerName ? `Meu nome é: *${customerName}*.` : 'Gostaria de informar o pagamento.';
-    const message = `Olá, acabei de realizar o pagamento via PIX para o produto: *${product.title}*. ${namePart} Segue o comprovante em anexo.`;
+    
+    let payDetails = '';
+    if (product.paymentType === 'recurring') {
+       payDetails = `Assinatura ${product.billingCycle === 'monthly' ? 'Mensal' : 'Anual'}`;
+       if (product.setupFee) payDetails += ` + Taxa de Adesão`;
+    } else {
+       payDetails = `Compra Única`;
+    }
+
+    const message = `Olá, acabei de realizar o pagamento via PIX para o produto: *${product.title}* (${payDetails}). ${namePart} Segue o comprovante em anexo.`;
     window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`, '_blank');
     
-    // 3. Close Modal
+    // Close Modal
     setTimeout(() => setShowPixModal(false), 2000);
+  };
+
+  const calculateTotalFirstPayment = () => {
+      let total = product.price;
+      if (product.paymentType === 'recurring' && product.setupFee) {
+          total += product.setupFee;
+      }
+      return total;
   };
 
   return (
@@ -83,7 +105,18 @@ export const ProductPage: React.FC = () => {
                 <ShoppingBag className="w-8 h-8 text-cyan-500" />
               </div>
               <h3 className="text-2xl font-bold mb-2 text-white">Pagamento Seguro via PIX</h3>
-              <p className="text-gray-400 mb-8 text-sm">Escaneie o QR Code para finalizar sua contratação instantaneamente.</p>
+              
+              <div className="mb-6">
+                <p className="text-gray-400 text-sm">Valor total a pagar agora:</p>
+                <p className="text-3xl font-bold text-white">
+                    R$ {calculateTotalFirstPayment().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                {product.paymentType === 'recurring' && (
+                    <p className="text-xs text-cyan-400 mt-1">
+                        (Primeira mensalidade {product.setupFee ? '+ Taxa de Adesão' : ''})
+                    </p>
+                )}
+              </div>
               
               <div className="bg-white p-4 rounded-xl mx-auto inline-block mb-8 shadow-xl">
                  <QRCode value={config.pix.key} size={180} />
@@ -128,12 +161,6 @@ export const ProductPage: React.FC = () => {
                     <Send className="w-4 h-4" /> Enviar Comprovante
                  </button>
               </div>
-
-              <div className="pt-2 border-t border-gray-800">
-                 <p className="text-xs text-green-400 flex items-center justify-center gap-2">
-                   <ShieldCheck className="w-4 h-4" /> Pagamento Processado com Segurança
-                 </p>
-              </div>
             </div>
           </div>
         </div>
@@ -147,7 +174,6 @@ export const ProductPage: React.FC = () => {
             <span className="font-medium text-sm">Voltar</span>
           </Link>
           
-           {/* Dynamic Logo in Navbar */}
            <div className="flex items-center gap-2">
               {config.logoImage ? (
                 <img src={config.logoImage} alt={config.logoText} className="h-8 md:h-10 object-contain" />
@@ -179,7 +205,7 @@ export const ProductPage: React.FC = () => {
         <div className="max-w-5xl mx-auto px-4 relative z-10 text-center pt-20">
           <div className="inline-block mb-6 animate-fade-in-up">
             <span className="px-4 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 text-xs font-bold uppercase tracking-[0.2em]">
-              Solução Premium
+              {product.paymentType === 'recurring' ? 'Plano de Assinatura' : 'Solução Premium'}
             </span>
           </div>
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 leading-[0.9] text-white tracking-tighter">
@@ -194,7 +220,7 @@ export const ProductPage: React.FC = () => {
               onClick={() => document.getElementById('checkout')?.scrollIntoView({ behavior: 'smooth' })}
               className="px-10 py-5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full font-bold text-lg transition-all shadow-[0_0_40px_rgba(8,145,178,0.4)] hover:shadow-[0_0_60px_rgba(8,145,178,0.6)] hover:-translate-y-1"
             >
-              Começar Agora
+              {product.paymentType === 'recurring' ? 'Assinar Agora' : 'Começar Agora'}
             </button>
             <button
                onClick={() => document.getElementById('detalhes')?.scrollIntoView({ behavior: 'smooth' })}
@@ -271,8 +297,10 @@ export const ProductPage: React.FC = () => {
         
         <div className="max-w-4xl mx-auto px-4 relative z-10">
            <div className="text-center mb-12">
-             <h2 className="text-3xl md:text-5xl font-bold mb-4">Investimento Único</h2>
-             <p className="text-gray-400">Sem mensalidades escondidas. Transparência total.</p>
+             <h2 className="text-3xl md:text-5xl font-bold mb-4">
+                 {product.paymentType === 'recurring' ? 'Assinatura Flexível' : 'Investimento Único'}
+             </h2>
+             <p className="text-gray-400">Transparência total. Sem surpresas.</p>
            </div>
 
            <div className="bg-gray-900/80 backdrop-blur-xl border border-gray-700/50 rounded-[40px] p-10 md:p-16 text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden group">
@@ -281,15 +309,33 @@ export const ProductPage: React.FC = () => {
              <div className="relative z-10">
                 <span className="bg-green-500/10 text-green-400 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-6 inline-block">Oferta Especial</span>
                 
-                <div className="flex items-center justify-center gap-1 mb-2">
-                   <span className="text-2xl text-gray-500 font-medium">R$</span>
-                   <span className="text-7xl md:text-8xl font-black text-white tracking-tighter">
-                     {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                   </span>
-                   <span className="text-2xl text-gray-500 font-medium self-end mb-4">,00</span>
+                <div className="flex flex-col items-center justify-center mb-2">
+                   <div className="flex items-center gap-1">
+                        <span className="text-2xl text-gray-500 font-medium">R$</span>
+                        <span className="text-7xl md:text-8xl font-black text-white tracking-tighter">
+                            {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                        <span className="text-2xl text-gray-500 font-medium self-end mb-4">,00</span>
+                   </div>
+                   {product.paymentType === 'recurring' && (
+                        <div className="text-cyan-400 font-bold uppercase tracking-widest text-sm mt-2">
+                            / {product.billingCycle === 'monthly' ? 'mês' : 'ano'}
+                        </div>
+                   )}
                 </div>
+
+                {product.setupFee && product.setupFee > 0 && (
+                    <p className="text-gray-400 mb-6 text-sm bg-gray-800 inline-block px-4 py-2 rounded-lg">
+                        + Taxa de adesão única de <span className="text-white font-bold">R$ {product.setupFee.toLocaleString('pt-BR')}</span>
+                    </p>
+                )}
                 
-                <p className="text-gray-400 mb-10 text-lg">Pagamento via PIX com ativação imediata</p>
+                <p className="text-gray-400 mb-10 text-lg">
+                    {product.paymentType === 'recurring' 
+                        ? 'Cancele quando quiser. Sem fidelidade.' 
+                        : 'Pagamento via PIX com ativação imediata'
+                    }
+                </p>
                 
                 <button 
                   onClick={() => setShowPixModal(true)}

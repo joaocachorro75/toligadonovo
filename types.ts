@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   slug: string;
@@ -6,9 +7,26 @@ export interface Product {
   shortDescription: string;
   fullDescription: string;
   price: number;
+  
+  // New Payment Fields
+  paymentType: 'one-time' | 'recurring';
+  billingCycle?: 'monthly' | 'yearly';
+  setupFee?: number; // Taxa de adesão/instalação
+
   heroImage: string;
   features: string[];
   ctaText: string;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string; // HTML or Markdown text
+  coverImage: string;
+  published: boolean;
+  createdAt: string;
 }
 
 export interface Lead {
@@ -24,10 +42,16 @@ export interface Order {
   id: string;
   productTitle: string;
   productPrice: number;
+  setupFee?: number;
+  isSubscription: boolean;
+  billingCycle?: string;
+  
   customerName: string;
   customerWhatsapp: string;
-  status: 'pending' | 'approved' | 'cancelled';
+  status: 'pending' | 'active' | 'cancelled'; // Active for subscriptions
   createdAt: string;
+  lastPaymentDate?: string;
+  nextPaymentDate?: string;
 }
 
 export interface PixConfig {
@@ -46,13 +70,23 @@ export interface HomeConfig {
   contactDescription: string;
 }
 
+export interface EvolutionConfig {
+  enabled: boolean;
+  baseUrl: string; // ex: https://api.meudominio.com
+  instanceName: string; // ex: toligado
+  apiKey: string;
+  welcomeMessage: string; // Mensagem ao criar pedido
+  reminderMessage: string; // Mensagem de cobrança
+}
+
 export interface SiteConfig {
   logoText: string;
-  logoImage?: string; // Base64 image string
+  logoImage?: string;
   logoColor: string;
   whatsapp: string;
   pix: PixConfig;
   home: HomeConfig;
+  evolution?: EvolutionConfig;
 }
 
 export interface AdminState {

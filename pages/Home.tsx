@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Star, Zap, ShoppingCart, Globe, Smartphone, Palette, Layout, Menu, X, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Star, Zap, ShoppingCart, Globe, Smartphone, Palette, Layout, Menu, X, CheckCircle2, RefreshCcw } from 'lucide-react';
 import { db } from '../services/db';
-import { Product, SiteConfig } from '../types';
+import { Product, SiteConfig, BlogPost } from '../types';
 import { LeadForm } from '../components/LeadForm';
 import { FloatingWhatsApp } from '../components/FloatingWhatsApp';
 
 export const Home: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [posts, setPosts] = useState<BlogPost[]>([]);
   const [config, setConfig] = useState<SiteConfig | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -17,8 +18,10 @@ export const Home: React.FC = () => {
       try {
         const p = await db.getProducts();
         const c = await db.getConfig();
+        const blogPosts = await db.getPosts();
         setProducts(p);
         setConfig(c);
+        setPosts(blogPosts.slice(0, 3)); // Show only latest 3
       } catch (e) {
         console.error("Failed to load home data", e);
       }
@@ -73,7 +76,7 @@ export const Home: React.FC = () => {
 
             {/* Desktop Nav */}
             <nav className="hidden lg:flex gap-6 items-center">
-              {products.map(p => (
+              {products.slice(0, 4).map(p => (
                 <Link 
                   key={p.id} 
                   to={`/produto/${p.slug}`} 
@@ -83,6 +86,13 @@ export const Home: React.FC = () => {
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cyan-500 transition-all group-hover:w-full"></span>
                 </Link>
               ))}
+               <Link 
+                  to="/dicas" 
+                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors relative group"
+                >
+                  Dicas & Blog
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cyan-500 transition-all group-hover:w-full"></span>
+                </Link>
             </nav>
 
             {/* CTA Button */}
@@ -118,6 +128,13 @@ export const Home: React.FC = () => {
                 {p.menuTitle}
               </Link>
             ))}
+             <Link 
+                to="/dicas" 
+                onClick={() => setIsMenuOpen(false)}
+                className="text-base font-medium text-gray-300 hover:text-cyan-400 py-2 border-b border-gray-800 last:border-0"
+              >
+                Dicas & Blog
+              </Link>
             <button 
               onClick={() => scrollToSection('contato')}
               className="bg-cyan-600 text-center py-3 rounded-lg font-bold text-white mt-2 w-full"
@@ -197,14 +214,16 @@ export const Home: React.FC = () => {
               <div key={product.id} className="group relative bg-gray-900 rounded-3xl p-1 border border-gray-800 hover:border-cyan-500/50 transition-all hover:-translate-y-2 duration-300">
                 <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
                 
-                <div className="bg-gray-900 h-full rounded-[20px] p-8 relative overflow-hidden">
+                <div className="bg-gray-900 h-full rounded-[20px] p-8 relative overflow-hidden flex flex-col">
                   <div className="mb-6 flex justify-between items-start">
                     <div className="w-14 h-14 rounded-2xl bg-gray-800 flex items-center justify-center group-hover:bg-cyan-500/20 group-hover:text-cyan-400 transition-colors">
                       {getIcon(product.slug)}
                     </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity -mr-2">
-                       <ArrowRight className="text-cyan-400 w-6 h-6" />
-                    </div>
+                    {product.paymentType === 'recurring' && (
+                        <div className="bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2 py-1 rounded text-xs font-bold uppercase flex items-center gap-1">
+                            <RefreshCcw className="w-3 h-3" /> Assinatura
+                        </div>
+                    )}
                   </div>
                   
                   <h3 className="text-2xl font-bold text-white mb-3 leading-tight">
@@ -214,7 +233,7 @@ export const Home: React.FC = () => {
                     {product.shortDescription}
                   </p>
                   
-                  <div className="space-y-3 mb-8">
+                  <div className="space-y-3 mb-8 flex-1">
                     {product.features.slice(0, 3).map((f, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
                         <CheckCircle2 className="w-3 h-3 text-cyan-500" />
@@ -233,6 +252,38 @@ export const Home: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Blog Section (Latest Tips) */}
+      <section className="py-24 bg-black border-t border-gray-900">
+        <div className="max-w-7xl mx-auto px-4">
+             <div className="flex justify-between items-end mb-12">
+                <div>
+                     <h2 className="text-3xl font-bold text-white mb-4">Dicas da To-Ligado</h2>
+                     <p className="text-gray-400">Conteúdo estratégico para crescer seu negócio.</p>
+                </div>
+                <Link to="/dicas" className="text-cyan-400 font-bold hover:text-white transition-colors flex items-center gap-2">
+                    Ver tudo <ArrowRight className="w-4 h-4" />
+                </Link>
+             </div>
+
+             <div className="grid md:grid-cols-3 gap-8">
+                 {posts.map(post => (
+                    <Link to={`/dicas/${post.slug}`} key={post.id} className="group cursor-pointer">
+                        <div className="aspect-video bg-gray-800 rounded-xl overflow-hidden mb-4 border border-gray-800 group-hover:border-cyan-500/50 transition-all">
+                            <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">{post.title}</h3>
+                        <p className="text-gray-500 text-sm line-clamp-2">{post.excerpt}</p>
+                    </Link>
+                 ))}
+                 {posts.length === 0 && (
+                     <div className="col-span-3 text-center py-10 bg-gray-900 rounded-xl text-gray-500">
+                         Em breve, novidades incríveis por aqui.
+                     </div>
+                 )}
+             </div>
         </div>
       </section>
 

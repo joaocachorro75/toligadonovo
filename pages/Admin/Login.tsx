@@ -1,31 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../services/db';
-import { Lock, Zap, Loader2 } from 'lucide-react';
+import { Lock, Zap, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export const AdminLogin: React.FC = () => {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
-  const [error, setError] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Clean old session data on mount to prevent stuck states
+  useEffect(() => {
+    db.logout();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(false);
+    setErrorMsg(null);
     
     try {
-      const success = await db.login(user, pass);
+      const success = await db.login(user.trim(), pass.trim());
+      
       if (success) {
-        navigate('/admin/dashboard');
+        // Short delay to allow state to settle before nav
+        setTimeout(() => navigate('/admin/dashboard'), 100);
       } else {
-        setError(true);
+        setErrorMsg('Usuário ou senha incorretos.');
+        setLoading(false);
       }
     } catch (e) {
       console.error(e);
-      setError(true);
-    } finally {
+      setErrorMsg('Erro inesperado.');
       setLoading(false);
     }
   };
@@ -54,24 +62,35 @@ export const AdminLogin: React.FC = () => {
               type="text" 
               value={user}
               onChange={(e) => setUser(e.target.value)}
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500"
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-colors"
               placeholder="admin"
             />
           </div>
           <div>
             <label className="block text-gray-400 text-sm font-medium mb-1">Senha</label>
-            <input 
-              type="password" 
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input 
+                type={showPass ? "text" : "password"}
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 transition-colors pr-12"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-cyan-400 transition-colors"
+              >
+                {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-600 mt-1 ml-1">Dica: usuário 'admin' / senha 'admin'</p>
           </div>
 
-          {error && (
-            <div className="bg-red-900/30 text-red-400 p-3 rounded-lg text-sm text-center border border-red-900/50">
-              Credenciais inválidas.
+          {errorMsg && (
+            <div className="bg-red-900/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-3 border border-red-900/50 animate-fade-in">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <span>{errorMsg}</span>
             </div>
           )}
 

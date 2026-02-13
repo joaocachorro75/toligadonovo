@@ -20,6 +20,19 @@ const setLocal = (key: string, data: any) => {
   } catch (e) { console.error("Local save failed", e); }
 };
 
+// --- HELPER: PHONE NORMALIZATION ---
+const normalizePhone = (phone: string): string => {
+  // Remove non-digits
+  let cleaned = phone.replace(/\D/g, '');
+  
+  // Brazil Logic (If 10 or 11 digits, assume BR and add 55)
+  if (cleaned.length >= 10 && cleaned.length <= 11) {
+    cleaned = '55' + cleaned;
+  }
+  
+  return cleaned;
+};
+
 // --- API HELPERS ---
 const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 4000) => {
   const controller = new AbortController();
@@ -251,10 +264,12 @@ export const db = {
   },
 
   addLead: async (name: string, whatsapp: string, originPage: string) => {
+    const cleanPhone = normalizePhone(whatsapp);
+    
     const newLead: Lead = {
       id: crypto.randomUUID(),
       name,
-      whatsapp,
+      whatsapp: cleanPhone,
       originPage,
       createdAt: new Date().toISOString(),
       status: 'new'
@@ -296,15 +311,32 @@ export const db = {
   },
 
   addOrder: async (title: string, price: number, name: string, whatsapp: string, extra: any) => {
+    const cleanPhone = normalizePhone(whatsapp);
+    const now = new Date();
+    
+    // Calculate Next Payment Date for Subscriptions
+    let nextPaymentDate = undefined;
+    if (extra.isSubscription) {
+        const nextDate = new Date(now);
+        if (extra.billingCycle === 'yearly') {
+            nextDate.setFullYear(nextDate.getFullYear() + 1);
+        } else {
+            // Default to monthly
+            nextDate.setMonth(nextDate.getMonth() + 1);
+        }
+        nextPaymentDate = nextDate.toISOString();
+    }
+
     const newOrder: Order = {
       id: crypto.randomUUID(),
       productTitle: title,
       productPrice: price,
       customerName: name,
-      customerWhatsapp: whatsapp,
+      customerWhatsapp: cleanPhone,
       status: extra.isSubscription ? 'active' : 'pending',
-      createdAt: new Date().toISOString(),
+      createdAt: now.toISOString(),
       isSubscription: false,
+      nextPaymentDate: nextPaymentDate,
       ...extra
     };
 

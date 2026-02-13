@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { db } from '../../services/db';
-import { Lock, Zap, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Lock, Zap, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export const AdminLogin: React.FC = () => {
   const [user, setUser] = useState('');
@@ -47,7 +48,11 @@ export const AdminLogin: React.FC = () => {
       </div>
 
       <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 p-8 rounded-2xl w-full max-w-md shadow-2xl relative z-10">
-        <div className="flex flex-col items-center mb-8">
+        <Link to="/" className="absolute top-8 left-8 text-gray-400 hover:text-white transition-colors flex items-center gap-1 text-xs font-medium">
+             <ArrowLeft className="w-3 h-3" /> Voltar para o Site
+        </Link>
+        
+        <div className="flex flex-col items-center mb-8 mt-4">
           <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mb-4">
             <Zap className="w-6 h-6 text-cyan-500" />
           </div>
@@ -84,7 +89,6 @@ export const AdminLogin: React.FC = () => {
                 {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            <p className="text-[10px] text-gray-600 mt-1 ml-1">Dica: usuário 'admin' / senha 'admin'</p>
           </div>
 
           {errorMsg && (

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '../../services/db';
 import { Lead, Product, SiteConfig, Order, BlogPost } from '../../types';
-import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { Trash2, Edit, Save, Plus, ExternalLink, Search, Phone, ShoppingBag, Check, X, Settings, Newspaper, RefreshCcw, Layout, Bell, MessageSquare, Send, RefreshCw, Wifi, WifiOff, AlertTriangle, Download } from 'lucide-react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { ImageUpload } from '../../components/ImageUpload';
 import { INITIAL_SITE_CONFIG } from '../../services/initialData';
@@ -69,6 +69,41 @@ export const AdminDashboard: React.FC = () => {
 
   const handleTabClick = (tab: string) => {
     navigate(`/admin/${tab}`);
+  };
+
+  // --- CSV Export Helpers ---
+  const downloadCSV = (content: string, filename: string) => {
+      const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  const handleExportLeads = () => {
+      if (leads.length === 0) return alert("Sem leads para exportar.");
+      
+      const header = "Nome,WhatsApp,Origem,Status,Data\n";
+      const rows = leads.map(l => 
+          `"${l.name}","${l.whatsapp}","${l.originPage}","${l.status}","${new Date(l.createdAt).toLocaleDateString()}"`
+      ).join("\n");
+      
+      downloadCSV(header + rows, `leads-toligado-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportOrders = () => {
+      if (orders.length === 0) return alert("Sem pedidos para exportar.");
+      
+      const header = "Cliente,WhatsApp,Produto,Preço,Tipo,Status,Data Início,Renovação\n";
+      const rows = orders.map(o => {
+          const nextDate = o.nextPaymentDate ? new Date(o.nextPaymentDate).toLocaleDateString() : '-';
+          return `"${o.customerName}","${o.customerWhatsapp}","${o.productTitle}","${o.productPrice}","${o.isSubscription ? 'Assinatura' : 'Único'}","${o.status}","${new Date(o.createdAt).toLocaleDateString()}","${nextDate}"`;
+      }).join("\n");
+      
+      downloadCSV(header + rows, `vendas-toligado-${new Date().toISOString().split('T')[0]}.csv`);
   };
 
   // --- Leads Actions ---
@@ -280,7 +315,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // --- Formatters ---
-  const formatPhone = (phone: string) => phone.replace(/(\+55)(\d{2})(\d{5})(\d{4})/, '$1 ($2) $3-$4');
+  const formatPhone = (phone: string) => phone.replace(/(\d{2})(\d{2})(\d{5})(\d{4})/, '+$1 ($2) $3-$4');
   const whatsappLink = (phone: string) => `https://wa.me/${phone.replace(/\+/g, '')}`;
 
   // --- Renders ---
@@ -294,15 +329,24 @@ export const AdminDashboard: React.FC = () => {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="text-xl md:text-2xl font-bold text-white">Gestão de Leads</h2>
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-            <input 
-              type="text" 
-              placeholder="Buscar..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none w-full md:w-64"
-            />
+          <div className="flex gap-4 w-full md:w-auto">
+             <div className="relative flex-1 md:flex-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+                <input 
+                type="text" 
+                placeholder="Buscar..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none w-full md:w-64"
+                />
+            </div>
+            <button 
+                onClick={handleExportLeads}
+                className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+                title="Baixar CSV"
+            >
+                <Download className="w-4 h-4" /> <span className="hidden md:inline">CSV</span>
+            </button>
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden overflow-x-auto">
@@ -350,14 +394,25 @@ export const AdminDashboard: React.FC = () => {
   const renderOrders = () => {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl md:text-2xl font-bold text-white">Vendas & Assinaturas</h2>
+        <div className="flex justify-between items-center">
+            <h2 className="text-xl md:text-2xl font-bold text-white">Vendas & Assinaturas</h2>
+            <button 
+                onClick={handleExportOrders}
+                className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-2 text-sm"
+            >
+                <Download className="w-4 h-4" /> Exportar CSV
+            </button>
+        </div>
+        
         <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-400 min-w-[800px]">
+          <table className="w-full text-left text-sm text-gray-400 min-w-[1000px]">
             <thead className="bg-gray-900 text-gray-200">
               <tr>
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Produto</th>
                 <th className="px-6 py-4">Tipo</th>
+                <th className="px-6 py-4">Data Início</th>
+                <th className="px-6 py-4">Renovação</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Ações</th>
               </tr>
@@ -384,6 +439,18 @@ export const AdminDashboard: React.FC = () => {
                         <span className="px-2 py-1 rounded-full bg-gray-700 text-gray-300 text-xs">Único</span>
                     )}
                   </td>
+                  <td className="px-6 py-4 text-xs">
+                     {new Date(order.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 text-xs font-bold text-white">
+                     {order.isSubscription && order.nextPaymentDate ? (
+                        <span className={new Date(order.nextPaymentDate) < new Date() ? "text-red-400" : "text-green-400"}>
+                            {new Date(order.nextPaymentDate).toLocaleDateString()}
+                        </span>
+                     ) : (
+                        <span className="text-gray-600">-</span>
+                     )}
+                  </td>
                   <td className="px-6 py-4">
                     <select value={order.status} onChange={(e) => handleUpdateOrderStatus(order, e.target.value as any)} className={`bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-bold ${order.status === 'active' || order.status === 'approved' ? 'text-green-400' : order.status === 'cancelled' ? 'text-red-400' : 'text-yellow-400'}`}>
                       <option value="pending">Pendente</option>
@@ -398,7 +465,7 @@ export const AdminDashboard: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              {orders.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center">Nenhuma venda registrada ainda.</td></tr>}
+              {orders.length === 0 && <tr><td colSpan={7} className="px-6 py-8 text-center">Nenhuma venda registrada ainda.</td></tr>}
             </tbody>
           </table>
         </div>

@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Star, Zap, ShoppingCart, Globe, Smartphone, Palette, Layout, Menu, X, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { ArrowRight, Star, Zap, ShoppingCart, Globe, Smartphone, Palette, Layout, Menu, X, CheckCircle2, RefreshCcw, ChevronRight } from 'lucide-react';
 import { db } from '../services/db';
 import { Product, SiteConfig, BlogPost } from '../types';
 import { LeadForm } from '../components/LeadForm';
@@ -28,6 +29,16 @@ export const Home: React.FC = () => {
     };
     loadData();
   }, []);
+
+  // Lock body scroll when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isMenuOpen]);
 
   const getIcon = (slug: string) => {
     switch (slug) {
@@ -61,7 +72,7 @@ export const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
-            <div className="flex-shrink-0 flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="flex-shrink-0 flex items-center gap-2 cursor-pointer relative z-[60]" onClick={() => { setIsMenuOpen(false); navigate('/'); }}>
               {config.logoImage ? (
                 <img src={config.logoImage} alt={config.logoText} className="h-10 object-contain" />
               ) : (
@@ -74,75 +85,90 @@ export const Home: React.FC = () => {
               )}
             </div>
 
-            {/* Desktop Nav */}
-            <nav className="hidden lg:flex gap-6 items-center">
-              {products.slice(0, 4).map(p => (
-                <Link 
-                  key={p.id} 
-                  to={`/produto/${p.slug}`} 
-                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors relative group"
-                >
-                  {p.menuTitle}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cyan-500 transition-all group-hover:w-full"></span>
-                </Link>
-              ))}
-               <Link 
-                  to="/dicas" 
-                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors relative group"
-                >
-                  Dicas & Blog
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cyan-500 transition-all group-hover:w-full"></span>
-                </Link>
-            </nav>
+            {/* Right Side Actions */}
+            <div className="flex items-center gap-4 md:gap-6 relative z-[60]">
+                {/* CTA Button (Hidden on small mobile, visible on larger screens) */}
+                <div className="hidden sm:block">
+                    <button 
+                        onClick={() => scrollToSection('contato')}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-cyan-900/30 hover:shadow-cyan-900/50"
+                    >
+                        Falar com Especialista
+                    </button>
+                </div>
 
-            {/* CTA Button */}
-            <div className="hidden lg:block">
-              <button 
-                onClick={() => scrollToSection('contato')}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all shadow-lg shadow-cyan-900/30 hover:shadow-cyan-900/50"
-              >
-                Falar com Especialista
-              </button>
+                {/* Hamburger Menu Trigger (Always Visible) */}
+                <button 
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-800 transition-colors"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                aria-label="Menu"
+                >
+                    {isMenuOpen ? <X className="w-8 h-8" /> : <Menu className="w-8 h-8" />}
+                </button>
             </div>
-
-            {/* Mobile Menu Button */}
-            <button 
-              className="lg:hidden text-gray-300 hover:text-white"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X className="w-8 h-8" /> : <Menu className="w-8 h-8" />}
-            </button>
           </div>
         </div>
 
-        {/* Mobile Nav */}
-        {isMenuOpen && (
-          <div className="lg:hidden bg-gray-900 border-b border-gray-800 absolute w-full left-0 top-20 p-4 flex flex-col gap-4 shadow-2xl">
-            {products.map(p => (
-              <Link 
-                key={p.id} 
-                to={`/produto/${p.slug}`} 
-                onClick={() => setIsMenuOpen(false)}
-                className="text-base font-medium text-gray-300 hover:text-cyan-400 py-2 border-b border-gray-800 last:border-0"
-              >
-                {p.menuTitle}
-              </Link>
-            ))}
-             <Link 
-                to="/dicas" 
-                onClick={() => setIsMenuOpen(false)}
-                className="text-base font-medium text-gray-300 hover:text-cyan-400 py-2 border-b border-gray-800 last:border-0"
-              >
-                Dicas & Blog
-              </Link>
-            <button 
-              onClick={() => scrollToSection('contato')}
-              className="bg-cyan-600 text-center py-3 rounded-lg font-bold text-white mt-2 w-full"
-            >
-              Orçamento Rápido
-            </button>
-          </div>
-        )}
+        {/* FULL SCREEN NAVIGATION OVERLAY */}
+        <div className={`fixed inset-0 bg-zinc-950/98 backdrop-blur-xl z-50 flex flex-col pt-24 pb-10 px-6 transition-all duration-300 ease-in-out ${isMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+            <div className="max-w-4xl mx-auto w-full h-full flex flex-col">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="grid md:grid-cols-2 gap-12">
+                        {/* Column 1: Main Navigation */}
+                        <div className="space-y-6">
+                            <h3 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Produtos & Soluções</h3>
+                            <div className="space-y-2">
+                                {products.map(p => (
+                                    <Link 
+                                        key={p.id} 
+                                        to={`/produto/${p.slug}`} 
+                                        onClick={() => setIsMenuOpen(false)}
+                                        className="group flex items-center justify-between p-4 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
+                                    >
+                                        <span className="text-xl md:text-2xl font-bold text-gray-300 group-hover:text-white">{p.menuTitle}</span>
+                                        <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Column 2: Other Links & Contact */}
+                        <div className="space-y-12">
+                            <div>
+                                <h3 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Conteúdo</h3>
+                                <Link 
+                                    to="/dicas" 
+                                    onClick={() => setIsMenuOpen(false)}
+                                    className="group flex items-center justify-between p-4 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
+                                >
+                                    <span className="text-xl md:text-2xl font-bold text-gray-300 group-hover:text-white">Blog & Dicas</span>
+                                    <ArrowRight className="w-5 h-5 text-gray-600 group-hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-all" />
+                                </Link>
+                            </div>
+
+                            <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-800">
+                                <h3 className="text-white font-bold mb-2">Precisa de ajuda rápida?</h3>
+                                <p className="text-gray-400 text-sm mb-4">Nosso time está online no WhatsApp agora.</p>
+                                <button 
+                                    onClick={() => scrollToSection('contato')}
+                                    className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
+                                >
+                                    Iniciar Conversa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Footer of Menu */}
+                <div className="mt-8 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center text-gray-500 text-sm gap-4">
+                    <p>© {new Date().getFullYear()} {config.logoText}</p>
+                    <div className="flex gap-6">
+                        <Link to="/admin" onClick={() => setIsMenuOpen(false)} className="hover:text-white">Admin</Link>
+                    </div>
+                </div>
+            </div>
+        </div>
       </header>
 
       {/* Hero Section */}

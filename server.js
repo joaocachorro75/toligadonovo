@@ -4,7 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const cors = require('cors');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)); // Dynamic import for node-fetch
+// Use native fetch (Node 18+) or fallback to dynamic import of node-fetch
+const fetch = (...args) => (global.fetch ? global.fetch(...args) : import('node-fetch').then(({default: f}) => f(...args)));
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

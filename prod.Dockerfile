@@ -1,3 +1,4 @@
+
 # Stage 1: Build React App
 FROM node:18-alpine as build
 WORKDIR /app
@@ -11,7 +12,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Install server dependencies (Pinning Express to v4 to fix PathError crash)
-RUN npm init -y && npm install express@4.21.2 multer cors
+RUN npm init -y && npm install express@4.21.2 multer cors node-fetch
 
 # Copy built assets from Stage 1 (Vite outputs to 'dist')
 COPY --from=build /app/dist ./dist

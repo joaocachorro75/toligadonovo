@@ -244,21 +244,9 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// Catch-all for React Router (Last Route)
-// Using app.use() instead of app.get('*') avoids "PathError" in strict environments/Express 5
-app.use((req, res) => {
-  // Only serve index.html for GET requests that accept HTML
-  if (req.method === 'GET' && req.accepts('html')) {
-    res.sendFile(path.join(DIST_PATH, 'index.html'), (err) => {
-      if (err) {
-        console.error("Error serving index.html:", err);
-        res.status(500).send("System Error");
-      }
-    });
-  } else {
-    // Return 404 for non-HTML requests (like missing API endpoints or assets)
-    res.status(404).json({ error: 'Not Found' });
-  }
+// Catch-all for React Router (must be last)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(DIST_PATH, 'index.html'));
 });
 
 // Graceful Shutdown

@@ -1,11 +1,15 @@
 
+// FIX: Disable SSL verification for internal Docker communication (EasyPanel/Coolify)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const cors = require('cors');
-// Use native fetch (Node 18+) or fallback to dynamic import of node-fetch
-const fetch = (...args) => (global.fetch ? global.fetch(...args) : import('node-fetch').then(({default: f}) => f(...args)));
+
+// Robust Fetch Import: Tries node-fetch first (better for Docker), falls back to native
+const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args)).catch(() => global.fetch(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -252,7 +256,9 @@ const sendEvolutionMessage = async (to, text) => {
 
     const apiKey = (config.apiKey || '').trim();
     const instanceName = (config.instanceName || '').trim();
-    const baseUrl = (config.baseUrl || '').replace(/\/$/, '');
+    let baseUrl = (config.baseUrl || '').trim().replace(/\/$/, '');
+    
+    if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
 
     // Clean number (keep only digits)
     const number = to.replace(/\D/g, '');
@@ -285,7 +291,8 @@ const sendEvolutionMessage = async (to, text) => {
             return false;
         }
     } catch (e) {
-        console.error("Failed to send Evolution message", e);
+        console.error("Failed to send Evolution message:", e.message);
+        if(e.cause) console.error("Cause:", e.cause);
         return false;
     }
 };
@@ -487,7 +494,9 @@ app.get('/api/evolution/status', async (req, res) => {
     try {
         const apiKey = (config.apiKey || '').trim();
         const instanceName = (config.instanceName || '').trim();
-        const baseUrl = (config.baseUrl || '').replace(/\/$/, '');
+        let baseUrl = (config.baseUrl || '').trim().replace(/\/$/, '');
+        
+        if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
         
         const url = `${baseUrl}/instance/connectionState/${instanceName}`;
         console.log(`Checking status at: ${url}`);
@@ -506,8 +515,9 @@ app.get('/api/evolution/status', async (req, res) => {
             res.json({ status: 'error', details: errorText, code: response.status });
         }
     } catch (e) {
-        console.error("Evolution Status Check Failed", e);
-        res.json({ status: 'error', details: e.message });
+        console.error("Evolution Status Check Failed:", e.message);
+        if (e.cause) console.error("Cause:", e.cause);
+        res.json({ status: 'error', details: e.message + (e.cause ? ` (${e.cause.code})` : '') });
     }
 });
 

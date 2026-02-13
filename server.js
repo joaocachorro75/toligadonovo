@@ -2,23 +2,29 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
 // Serve static files from the React build directory (dist)
-app.use(express.static(path.join(__dirname, 'dist')));
+// Using absolute path resolving to ensure reliability in Docker
+const DIST_PATH = path.join(__dirname, 'dist');
+app.use(express.static(DIST_PATH));
+
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Data & Uploads setup
-const DATA_DIR = path.join(__dirname, 'data');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Unique database name to avoid confusion
+// Data setup
+const DATA_DIR = path.join(__dirname, 'data');
+// Unique database name to avoid conflicts with other apps in the same volume
 const DB_FILE = path.join(DATA_DIR, 'database_toligado.json');
 
+// Ensure directories exist
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
@@ -100,9 +106,8 @@ const loadDB = () => {
     dbCache = JSON.parse(fileContent);
   } catch (e) {
     console.error("CRITICAL: DB File corrupt. Creating backup and resetting.", e);
-    // Backup corrupt file just in case
     if (fs.existsSync(DB_FILE)) {
-        fs.copyFileSync(DB_FILE, DB_FILE + '.corrupt.' + Date.now());
+        try { fs.copyFileSync(DB_FILE, DB_FILE + '.corrupt.' + Date.now()); } catch(err) {}
     }
     dbCache = JSON.parse(JSON.stringify(INITIAL_DATA));
     saveDB();
@@ -110,13 +115,13 @@ const loadDB = () => {
   return dbCache;
 };
 
-// Atomic Write Strategy: Write to temp file -> Rename
+// Atomic Write Strategy
 const saveDB = () => {
   if (!dbCache) return;
   try {
     const tempFile = DB_FILE + '.tmp';
     fs.writeFileSync(tempFile, JSON.stringify(dbCache, null, 2));
-    fs.renameSync(tempFile, DB_FILE); // Atomic operation
+    fs.renameSync(tempFile, DB_FILE);
   } catch (e) {
     console.error("Error saving DB:", e);
   }
@@ -127,7 +132,7 @@ loadDB();
 
 // --- API ROUTES ---
 
-// Health Check for EasyPanel
+// Health Check for EasyPanel monitoring
 app.get('/health', (req, res) => {
   if (dbCache) res.status(200).send('OK');
   else res.status(503).send('Initializing');
@@ -239,15 +244,27 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// Catch-all for React Router
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// Catch-all for React Router (Last Route)
+// Using app.use() instead of app.get('*') avoids "PathError" in strict environments/Express 5
+app.use((req, res) => {
+  // Only serve index.html for GET requests that accept HTML
+  if (req.method === 'GET' && req.accepts('html')) {
+    res.sendFile(path.join(DIST_PATH, 'index.html'), (err) => {
+      if (err) {
+        console.error("Error serving index.html:", err);
+        res.status(500).send("System Error");
+      }
+    });
+  } else {
+    // Return 404 for non-HTML requests (like missing API endpoints or assets)
+    res.status(404).json({ error: 'Not Found' });
+  }
 });
 
-// Graceful Shutdown to prevent DB corruption
+// Graceful Shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  saveDB(); // Ensure DB is saved
+  saveDB();
   process.exit(0);
 });
 

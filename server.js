@@ -42,7 +42,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- INITIAL DATA ---
+// --- INITIAL DATA COMPLETO ---
 const INITIAL_DATA = {
   config: {
     logoText: 'To-Ligado.com',
@@ -70,19 +70,113 @@ const INITIAL_DATA = {
   },
   products: [
     {
-        id: '8',
-        slug: 'tv-cine-box',
-        title: 'TV Cine Box 4K',
-        menuTitle: 'TV Online',
-        shortDescription: 'Todos os canais, filmes e séries em um só lugar.',
-        fullDescription: 'Transforme sua TV, Celular ou Computador em um cinema completo.',
-        price: 35.00,
-        paymentType: 'recurring',
-        billingCycle: 'monthly',
-        heroImage: 'https://images.unsplash.com/photo-1593784653277-226e3c6a4696?auto=format&fit=crop&q=80&w=2000',
-        features: ['+2000 Canais Ao Vivo', 'Filmes e Séries', 'Qualidade 4K'],
-        ctaText: 'Assinar Agora'
-      }
+      id: '8',
+      slug: 'tv-cine-box',
+      title: 'TV Cine Box 4K',
+      menuTitle: 'TV Online',
+      shortDescription: 'Todos os canais, filmes e séries em um só lugar.',
+      fullDescription: 'Transforme sua TV, Celular ou Computador em um cinema completo. Tenha acesso a mais de 2.000 canais ao vivo, incluindo esportes, notícias, infantis e adultos (opcional), além de um catálogo on-demand com mais de 10.000 filmes e séries atualizados diariamente.',
+      price: 35.00,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1593784653277-226e3c6a4696?auto=format&fit=crop&q=80&w=2000',
+      features: ['+2000 Canais Ao Vivo', 'Filmes e Séries', 'Qualidade 4K', 'Sem Antenas'],
+      ctaText: 'Assinar Agora'
+    },
+    {
+      id: '1',
+      slug: 'landing-pages',
+      title: 'Landing Pages de Alta Conversão',
+      menuTitle: 'Landing Pages',
+      shortDescription: 'Páginas que captam leads e vendem sozinhas.',
+      fullDescription: 'Desenvolvemos Landing Pages otimizadas para conversão, com design moderno e carregamento ultrarrápido.',
+      price: 497.00,
+      paymentType: 'one-time',
+      heroImage: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=2000',
+      features: ['Design Responsivo', 'Alta Velocidade', 'Otimizado SEO'],
+      ctaText: 'Quero Vender Mais'
+    },
+    {
+      id: '2',
+      slug: 'zap-marketing',
+      title: 'Zap Marketing + Atendente 24h',
+      menuTitle: 'Zap Marketing',
+      shortDescription: 'Plataforma de envio em massa e atendimento automático.',
+      fullDescription: 'Automatize sua comunicação no WhatsApp. Envie mensagens em massa e tenha um atendente virtual 24h.',
+      price: 199.90,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&q=80&w=2000',
+      features: ['Envio em Massa', 'Chatbot Inteligente', 'Gestão de Grupos'],
+      ctaText: 'Automatizar Agora'
+    },
+    {
+      id: '3',
+      slug: 'lojas-virtuais',
+      title: 'Lojas Virtuais Profissionais',
+      menuTitle: 'Lojas Virtuais',
+      shortDescription: 'E-commerce completo e profissional.',
+      fullDescription: 'Tenha sua própria loja online profissional com gestão de produtos e pagamentos.',
+      price: 1499.00,
+      paymentType: 'one-time',
+      heroImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=2000',
+      features: ['Painel de Gestão', 'Pagamento Integrado', 'Frete Automático'],
+      ctaText: 'Montar Minha Loja'
+    },
+    {
+      id: '4',
+      slug: 'blogs-ia',
+      title: 'Blogs Automáticos com IA',
+      menuTitle: 'Blogs IA',
+      shortDescription: 'Conteúdo infinito gerado por inteligência artificial.',
+      fullDescription: 'Mantenha seu site atualizado com artigos otimizados para SEO criados automaticamente pela IA.',
+      price: 89.90,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=2000',
+      features: ['Postagens Diárias', 'Imagens Geradas', 'Zero Esforço'],
+      ctaText: 'Ativar Blog IA'
+    },
+    {
+      id: '5',
+      slug: 'sistema-delivery',
+      title: 'Sistema de Delivery Completo',
+      menuTitle: 'Delivery',
+      shortDescription: 'Ideal para restaurantes e lanchonetes.',
+      fullDescription: 'Receba pedidos diretamente no WhatsApp sem taxas de marketplace. Cardápio digital interativo.',
+      price: 99.00,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=2000',
+      features: ['Cardápio Digital', 'Sem Taxas por Pedido', 'Link Próprio'],
+      ctaText: 'Digitalizar Restaurante'
+    },
+    {
+      id: '6',
+      slug: 'turbo-combo',
+      title: 'Combinação Turbo: LP + Zap',
+      menuTitle: 'Combo Turbo',
+      shortDescription: 'A dupla perfeita para escalar suas vendas.',
+      fullDescription: 'O poder da Landing Page para captar leads somado à automação do Zap Marketing.',
+      price: 597.00,
+      paymentType: 'one-time',
+      heroImage: 'https://images.unsplash.com/photo-1517976487492-5750f3195933?auto=format&fit=crop&q=80&w=2000',
+      features: ['LP Inclusa', '3 Meses de Zap', 'Configuração Total'],
+      ctaText: 'Quero o Combo'
+    },
+    {
+      id: '7',
+      slug: 'design-grafico',
+      title: 'Design Gráfico e Identidade',
+      menuTitle: 'Design',
+      shortDescription: 'Logomarcas e artes para redes sociais.',
+      fullDescription: 'Criação de identidade visual, logotipos e materiais gráficos com qualidade de agência.',
+      price: 150.00,
+      paymentType: 'one-time',
+      heroImage: 'https://images.unsplash.com/photo-1626785774573-4b799312c95d?auto=format&fit=crop&q=80&w=2000',
+      features: ['Design Exclusivo', 'Arquivos em Alta', 'Revisões Ilimitadas'],
+      ctaText: 'Solicitar Design'
+    }
   ],
   posts: [
     {
@@ -104,6 +198,26 @@ const INITIAL_DATA = {
       coverImage: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=1200',
       published: true,
       createdAt: new Date().toISOString()
+    },
+    {
+        id: '3',
+        title: 'O Fim da TV a Cabo? Conheça a Revolução do Streaming 4K',
+        slug: 'fim-da-tv-a-cabo-revolucao-streaming',
+        excerpt: 'Por que pagar caro em pacotes limitados?',
+        content: 'O modelo tradicional de TV por assinatura está em colapso. Conheça a liberdade do streaming 4K.',
+        coverImage: 'https://images.unsplash.com/photo-1593784653277-226e3c6a4696?auto=format&fit=crop&q=80&w=1200',
+        published: true,
+        createdAt: new Date().toISOString()
+    },
+    {
+        id: '4',
+        title: 'Conteúdo Infinito: Como a IA mantém seu Blog atualizado',
+        slug: 'conteudo-infinito-ia-blog',
+        excerpt: 'O Google ama conteúdo novo. Saiba como automatizar seu SEO.',
+        content: 'Para aparecer na primeira página do Google, você precisa de conteúdo frequente. A IA faz isso por você.',
+        coverImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=1200',
+        published: true,
+        createdAt: new Date().toISOString()
     }
   ],
   leads: [],
@@ -125,17 +239,14 @@ const loadDB = () => {
     dbCache = JSON.parse(fileContent);
     
     let modified = false;
-    // Se os posts não existirem ou estiverem vazios, recarrega os padrões
-    if (!dbCache.posts || dbCache.posts.length === 0) {
+
+    // Repopula se estiver faltando posts ou produtos (ex: atualização de código)
+    if (!dbCache.posts || dbCache.posts.length < INITIAL_DATA.posts.length) {
        dbCache.posts = INITIAL_DATA.posts;
        modified = true;
     }
-    if (!dbCache.products || dbCache.products.length === 0) {
+    if (!dbCache.products || dbCache.products.length < INITIAL_DATA.products.length) {
         dbCache.products = INITIAL_DATA.products;
-        modified = true;
-    }
-    if (!dbCache.config.adminPassword) {
-        dbCache.config.adminPassword = INITIAL_DATA.config.adminPassword;
         modified = true;
     }
     
@@ -282,7 +393,7 @@ app.post('/api/evolution/reminder', async (req, res) => {
   res.json({ success });
 });
 
-// Lead Routes (PUT and DELETE)
+// Lead Routes
 app.get('/api/leads', (req, res) => res.json(loadDB().leads || []));
 app.post('/api/leads', (req, res) => {
   const db = loadDB();
@@ -311,7 +422,7 @@ app.delete('/api/leads/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// Order Routes (PUT and DELETE)
+// Order Routes
 app.get('/api/orders', (req, res) => res.json(loadDB().orders || []));
 app.post('/api/orders', async (req, res) => {
   const db = loadDB();

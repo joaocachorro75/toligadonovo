@@ -1,4 +1,3 @@
-
 // FIX: Disable SSL verification for internal Docker communication (EasyPanel/Coolify)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -42,7 +41,88 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- INITIAL DATA COMPLETO ---
+// ============================================
+// MYSQL SUPPORT (opcional, fallback para JSON)
+// ============================================
+let mysqlPool = null;
+let useMySQL = false;
+
+const MYSQL_CONFIG = {
+  host: process.env.MYSQL_HOST || null,
+  port: parseInt(process.env.MYSQL_PORT || '3306'),
+  user: process.env.MYSQL_USER || null,
+  password: process.env.MYSQL_PASSWORD || null,
+  database: process.env.MYSQL_DATABASE || null
+};
+
+// Verifica se MySQL está configurado
+if (MYSQL_CONFIG.host && MYSQL_CONFIG.user && MYSQL_CONFIG.database) {
+  try {
+    const mysql = require('mysql2/promise');
+    mysqlPool = mysql.createPool(MYSQL_CONFIG);
+    useMySQL = true;
+    console.log('✅ MySQL conectado!');
+  } catch (e) {
+    console.log('⚠️ MySQL não disponível, usando JSON como fallback');
+    useMySQL = false;
+  }
+} else {
+  console.log('📦 Usando JSON como banco de dados');
+}
+
+// Tabelas MySQL
+const CREATE_TABLES = `
+CREATE TABLE IF NOT EXISTS config (
+  id INT PRIMARY KEY DEFAULT 1,
+  data JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id VARCHAR(50) PRIMARY KEY,
+  data JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS posts (
+  id VARCHAR(50) PRIMARY KEY,
+  data JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS leads (
+  id VARCHAR(50) PRIMARY KEY,
+  data JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id VARCHAR(50) PRIMARY KEY,
+  data JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+`;
+
+// Inicializa tabelas MySQL
+async function initMySQL() {
+  if (!useMySQL || !mysqlPool) return;
+  
+  try {
+    const conn = await mysqlPool.getConnection();
+    await conn.query(CREATE_TABLES);
+    conn.release();
+    console.log('✅ Tabelas MySQL criadas/verificadas');
+  } catch (e) {
+    console.error('❌ Erro ao criar tabelas:', e.message);
+  }
+}
+
+initMySQL();
+
+// ============================================
+// INITIAL DATA
+// ============================================
 const INITIAL_DATA = {
   config: {
     logoText: 'To-Ligado.com',
@@ -224,9 +304,241 @@ const INITIAL_DATA = {
   orders: []
 };
 
-// --- DB Handling ---
+// ============================================
+// DB HANDLING (JSON ou MySQL)
+// ============================================
 let dbCache = null;
 
+// Carregar config
+async function loadConfig() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT data FROM config WHERE id = 1');
+      if (rows.length > 0) {
+        return JSON.parse(rows[0].data);
+      } else {
+        // Inserir config inicial
+        await mysqlPool.query('INSERT INTO config (id, data) VALUES (1, ?)', [JSON.stringify(INITIAL_DATA.config)]);
+        return INITIAL_DATA.config;
+      }
+    } catch (e) {
+      console.error('Erro ao carregar config MySQL:', e.message);
+      return INITIAL_DATA.config;
+    }
+  }
+  // Fallback JSON
+  return loadDB().config;
+}
+
+// Salvar config
+async function saveConfig(config) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('UPDATE config SET data = ? WHERE id = 1', [JSON.stringify(config)]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar config MySQL:', e.message);
+      return false;
+    }
+  }
+  // Fallback JSON
+  const db = loadDB();
+  db.config = config;
+  saveDB();
+  return true;
+}
+
+// Carregar produtos
+async function loadProducts() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT data FROM products ORDER BY created_at');
+      return rows.map(r => JSON.parse(r.data));
+    } catch (e) {
+      console.error('Erro ao carregar products MySQL:', e.message);
+      return INITIAL_DATA.products;
+    }
+  }
+  return loadDB().products || [];
+}
+
+// Salvar produtos
+async function saveProducts(products) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('DELETE FROM products');
+      for (const product of products) {
+        await mysqlPool.query('INSERT INTO products (id, data) VALUES (?, ?)', [product.id, JSON.stringify(product)]);
+      }
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar products MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  db.products = products;
+  saveDB();
+  return true;
+}
+
+// Carregar posts
+async function loadPosts() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT data FROM posts ORDER BY created_at DESC');
+      return rows.map(r => JSON.parse(r.data));
+    } catch (e) {
+      console.error('Erro ao carregar posts MySQL:', e.message);
+      return [];
+    }
+  }
+  return loadDB().posts || [];
+}
+
+// Salvar post
+async function savePost(post) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('INSERT INTO posts (id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = ?', 
+        [post.id, JSON.stringify(post), JSON.stringify(post)]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar post MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  if (!db.posts) db.posts = [];
+  const index = db.posts.findIndex(p => p.id === post.id);
+  if (index >= 0) db.posts[index] = post;
+  else db.posts.unshift(post);
+  saveDB();
+  return true;
+}
+
+// Deletar post
+async function deletePost(id) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('DELETE FROM posts WHERE id = ?', [id]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao deletar post MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  db.posts = db.posts.filter(p => p.id !== id);
+  saveDB();
+  return true;
+}
+
+// Carregar leads
+async function loadLeads() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT data FROM leads ORDER BY created_at DESC');
+      return rows.map(r => JSON.parse(r.data));
+    } catch (e) {
+      console.error('Erro ao carregar leads MySQL:', e.message);
+      return [];
+    }
+  }
+  return loadDB().leads || [];
+}
+
+// Salvar lead
+async function saveLead(lead) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('INSERT INTO leads (id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = ?', 
+        [lead.id, JSON.stringify(lead), JSON.stringify(lead)]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar lead MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  if (!db.leads) db.leads = [];
+  const index = db.leads.findIndex(l => l.id === lead.id);
+  if (index >= 0) db.leads[index] = lead;
+  else db.leads.unshift(lead);
+  saveDB();
+  return true;
+}
+
+// Deletar lead
+async function deleteLead(id) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('DELETE FROM leads WHERE id = ?', [id]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao deletar lead MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  db.leads = db.leads.filter(l => l.id !== id);
+  saveDB();
+  return true;
+}
+
+// Carregar orders
+async function loadOrders() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT data FROM orders ORDER BY created_at DESC');
+      return rows.map(r => JSON.parse(r.data));
+    } catch (e) {
+      console.error('Erro ao carregar orders MySQL:', e.message);
+      return [];
+    }
+  }
+  return loadDB().orders || [];
+}
+
+// Salvar order
+async function saveOrder(order) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('INSERT INTO orders (id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = ?', 
+        [order.id, JSON.stringify(order), JSON.stringify(order)]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar order MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  if (!db.orders) db.orders = [];
+  const index = db.orders.findIndex(o => o.id === order.id);
+  if (index >= 0) db.orders[index] = order;
+  else db.orders.unshift(order);
+  saveDB();
+  return true;
+}
+
+// Deletar order
+async function deleteOrder(id) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('DELETE FROM orders WHERE id = ?', [id]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao deletar order MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  db.orders = db.orders.filter(o => o.id !== id);
+  saveDB();
+  return true;
+}
+
+// --- JSON DB Handling (fallback) ---
 const loadDB = () => {
   if (dbCache) return dbCache;
   if (!fs.existsSync(DB_FILE)) {
@@ -239,8 +551,6 @@ const loadDB = () => {
     dbCache = JSON.parse(fileContent);
     
     let modified = false;
-
-    // Repopula se estiver faltando posts ou produtos (ex: atualização de código)
     if (!dbCache.posts || dbCache.posts.length < INITIAL_DATA.posts.length) {
        dbCache.posts = INITIAL_DATA.posts;
        modified = true;
@@ -249,9 +559,7 @@ const loadDB = () => {
         dbCache.products = INITIAL_DATA.products;
         modified = true;
     }
-    
     if (modified) saveDB();
-
   } catch (e) {
     dbCache = JSON.parse(JSON.stringify(INITIAL_DATA));
     saveDB();
@@ -274,13 +582,13 @@ loadDB();
 
 // --- EVOLUTION API HELPER ---
 const sendEvolutionMessage = async (to, text) => {
-    const db = loadDB();
-    const config = db.config.evolution;
-    if (!config || !config.enabled || !config.baseUrl || !config.apiKey) return false;
+    const config = await loadConfig();
+    const evolution = config.evolution;
+    if (!evolution || !evolution.enabled || !evolution.baseUrl || !evolution.apiKey) return false;
 
-    const apiKey = (config.apiKey || '').trim();
-    const instanceName = (config.instanceName || '').trim();
-    let baseUrl = (config.baseUrl || '').trim().replace(/\/$/, '');
+    const apiKey = (evolution.apiKey || '').trim();
+    const instanceName = (evolution.instanceName || '').trim();
+    let baseUrl = (evolution.baseUrl || '').trim().replace(/\/$/, '');
     if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
 
     const number = to.replace(/\D/g, '');
@@ -299,66 +607,52 @@ const sendEvolutionMessage = async (to, text) => {
 };
 
 // --- Routes ---
-app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'OK', database: useMySQL ? 'MySQL' : 'JSON' }));
 
-app.get('/api/config', (req, res) => res.json(loadDB().config));
-app.post('/api/config', (req, res) => {
-  const db = loadDB();
-  db.config = req.body;
-  saveDB();
-  res.json({ success: true });
-});
+app.get('/api/config', async (req, res) => res.json(await loadConfig()));
 
-app.get('/api/products', (req, res) => res.json(loadDB().products || []));
-app.post('/api/products', (req, res) => {
-  const db = loadDB();
-  db.products = req.body;
-  saveDB();
+app.post('/api/config', async (req, res) => {
+  await saveConfig(req.body);
   res.json({ success: true });
 });
 
-app.get('/api/posts', (req, res) => res.json(loadDB().posts || []));
-app.post('/api/posts', (req, res) => {
-  const db = loadDB();
-  if (!db.posts) db.posts = [];
-  db.posts.unshift(req.body);
-  saveDB();
+app.get('/api/products', async (req, res) => res.json(await loadProducts()));
+
+app.post('/api/products', async (req, res) => {
+  await saveProducts(req.body);
   res.json({ success: true });
 });
-app.put('/api/posts/:id', (req, res) => {
-  const db = loadDB();
-  if (db.posts) {
-    const index = db.posts.findIndex(p => p.id === req.params.id);
-    if (index !== -1) {
-      db.posts[index] = req.body;
-      saveDB();
-    }
-  }
+
+app.get('/api/posts', async (req, res) => res.json(await loadPosts()));
+
+app.post('/api/posts', async (req, res) => {
+  await savePost(req.body);
   res.json({ success: true });
 });
-app.delete('/api/posts/:id', (req, res) => {
-  const db = loadDB();
-  if (db.posts) {
-    db.posts = db.posts.filter(p => p.id !== req.params.id);
-    saveDB();
-  }
+
+app.put('/api/posts/:id', async (req, res) => {
+  await savePost(req.body);
+  res.json({ success: true });
+});
+
+app.delete('/api/posts/:id', async (req, res) => {
+  await deletePost(req.params.id);
   res.json({ success: true });
 });
 
 // Evolution API Routes
 app.get('/api/evolution/status', async (req, res) => {
-  const db = loadDB();
-  const config = db.config.evolution;
-  if (!config || !config.baseUrl || !config.apiKey) {
+  const config = await loadConfig();
+  const evolution = config.evolution;
+  if (!evolution || !evolution.baseUrl || !evolution.apiKey) {
     return res.json({ status: 'error', details: 'Configuração incompleta' });
   }
 
-  const apiKey = (config.apiKey || '').trim();
-  const instanceName = (config.instanceName || '').trim();
-  let baseUrl = (config.baseUrl || '').trim().replace(/\/$/, '');
+  const apiKey = (evolution.apiKey || '').trim();
+  const instanceName = (evolution.instanceName || '').trim();
+  let baseUrl = (evolution.baseUrl || '').trim().replace(/\/$/, '');
   if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
 
-  // CORRIGIDO: usar /instance/fetchInstances ao invés de /instance/connectionStatus
   const url = `${baseUrl}/instance/fetchInstances`;
 
   try {
@@ -368,7 +662,6 @@ app.get('/api/evolution/status', async (req, res) => {
     });
     const data = await response.json();
     
-    // Buscar a instância específica pelo nome
     let instanceData = null;
     if (Array.isArray(data)) {
       instanceData = data.find(inst => inst.name === instanceName);
@@ -403,11 +696,12 @@ app.post('/api/evolution/test', async (req, res) => {
 
 app.post('/api/evolution/reminder', async (req, res) => {
   const { orderId } = req.body;
-  const db = loadDB();
-  const order = db.orders.find(o => o.id === orderId);
+  const config = await loadConfig();
+  const orders = await loadOrders();
+  const order = orders.find(o => o.id === orderId);
   if (!order) return res.status(404).json({ success: false, error: 'Pedido não encontrado' });
 
-  const message = (db.config.evolution?.reminderMessage || 'Lembrete de pagamento')
+  const message = (config.evolution?.reminderMessage || 'Lembrete de pagamento')
     .replace('{cliente}', order.customerName)
     .replace('{produto}', order.productTitle);
 
@@ -416,60 +710,38 @@ app.post('/api/evolution/reminder', async (req, res) => {
 });
 
 // Lead Routes
-app.get('/api/leads', (req, res) => res.json(loadDB().leads || []));
-app.post('/api/leads', (req, res) => {
-  const db = loadDB();
-  if (!db.leads) db.leads = [];
-  db.leads.unshift(req.body);
-  saveDB();
+app.get('/api/leads', async (req, res) => res.json(await loadLeads()));
+
+app.post('/api/leads', async (req, res) => {
+  await saveLead(req.body);
   res.json({ success: true });
 });
-app.put('/api/leads/:id', (req, res) => {
-  const db = loadDB();
-  if (db.leads) {
-    const index = db.leads.findIndex(l => l.id === req.params.id);
-    if (index !== -1) {
-      db.leads[index] = req.body;
-      saveDB();
-    }
-  }
+
+app.put('/api/leads/:id', async (req, res) => {
+  await saveLead(req.body);
   res.json({ success: true });
 });
-app.delete('/api/leads/:id', (req, res) => {
-  const db = loadDB();
-  if (db.leads) {
-    db.leads = db.leads.filter(l => l.id !== req.params.id);
-    saveDB();
-  }
+
+app.delete('/api/leads/:id', async (req, res) => {
+  await deleteLead(req.params.id);
   res.json({ success: true });
 });
 
 // Order Routes
-app.get('/api/orders', (req, res) => res.json(loadDB().orders || []));
+app.get('/api/orders', async (req, res) => res.json(await loadOrders()));
+
 app.post('/api/orders', async (req, res) => {
-  const db = loadDB();
-  if (!db.orders) db.orders = [];
-  db.orders.unshift(req.body);
-  saveDB();
+  await saveOrder(req.body);
   res.json({ success: true });
 });
-app.put('/api/orders/:id', (req, res) => {
-  const db = loadDB();
-  if (db.orders) {
-    const index = db.orders.findIndex(o => o.id === req.params.id);
-    if (index !== -1) {
-      db.orders[index] = req.body;
-      saveDB();
-    }
-  }
+
+app.put('/api/orders/:id', async (req, res) => {
+  await saveOrder(req.body);
   res.json({ success: true });
 });
-app.delete('/api/orders/:id', (req, res) => {
-  const db = loadDB();
-  if (db.orders) {
-    db.orders = db.orders.filter(o => o.id !== req.params.id);
-    saveDB();
-  }
+
+app.delete('/api/orders/:id', async (req, res) => {
+  await deleteOrder(req.params.id);
   res.json({ success: true });
 });
 
@@ -478,10 +750,10 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   res.json({ url: `/uploads/${req.file.filename}` });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { user, pass } = req.body || {};
-  const db = loadDB();
-  const currentPassword = db.config?.adminPassword || 'admin123';
+  const config = await loadConfig();
+  const currentPassword = config?.adminPassword || 'admin123';
   if (user === 'admin' && pass === currentPassword) {
     res.json({ success: true, token: 'valid-token-' + Date.now() });
   } else {
@@ -499,4 +771,4 @@ app.use((req, res, next) => {
 });
 
 process.on('SIGTERM', () => { saveDB(); process.exit(0); });
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT} | DB: ${useMySQL ? 'MySQL' : 'JSON'}`));

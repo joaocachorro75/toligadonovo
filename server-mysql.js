@@ -313,7 +313,9 @@ async function loadConfig() {
     try {
       const [rows] = await mysqlPool.query('SELECT data FROM config WHERE id = 1');
       if (rows.length > 0) {
-        return JSON.parse(rows[0].data);
+        const data = rows[0].data;
+        // MySQL retorna JSON como objeto, não precisa de parse
+        return typeof data === 'string' ? JSON.parse(data) : data;
       } else {
         // Inserir config inicial
         await mysqlPool.query('INSERT INTO config (id, data) VALUES (1, ?)', [JSON.stringify(INITIAL_DATA.config)]);
@@ -354,7 +356,7 @@ async function loadProducts() {
   if (useMySQL && mysqlPool) {
     try {
       const [rows] = await mysqlPool.query('SELECT data FROM products ORDER BY created_at');
-      return rows.map(r => JSON.parse(r.data));
+      return rows.map(r => { const d = r.data; return typeof d === "string" ? JSON.parse(d) : d; });
     } catch (e) {
       console.error('Erro ao carregar products MySQL:', e.message);
       return INITIAL_DATA.products;
@@ -388,7 +390,7 @@ async function loadPosts() {
   if (useMySQL && mysqlPool) {
     try {
       const [rows] = await mysqlPool.query('SELECT data FROM posts ORDER BY created_at DESC');
-      return rows.map(r => JSON.parse(r.data));
+      return rows.map(r => { const d = r.data; return typeof d === "string" ? JSON.parse(d) : d; });
     } catch (e) {
       console.error('Erro ao carregar posts MySQL:', e.message);
       return [];
@@ -440,7 +442,7 @@ async function loadLeads() {
   if (useMySQL && mysqlPool) {
     try {
       const [rows] = await mysqlPool.query('SELECT data FROM leads ORDER BY created_at DESC');
-      return rows.map(r => JSON.parse(r.data));
+      return rows.map(r => { const d = r.data; return typeof d === "string" ? JSON.parse(d) : d; });
     } catch (e) {
       console.error('Erro ao carregar leads MySQL:', e.message);
       return [];
@@ -492,7 +494,7 @@ async function loadOrders() {
   if (useMySQL && mysqlPool) {
     try {
       const [rows] = await mysqlPool.query('SELECT data FROM orders ORDER BY created_at DESC');
-      return rows.map(r => JSON.parse(r.data));
+      return rows.map(r => { const d = r.data; return typeof d === "string" ? JSON.parse(d) : d; });
     } catch (e) {
       console.error('Erro ao carregar orders MySQL:', e.message);
       return [];

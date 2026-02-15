@@ -332,7 +332,10 @@ async function loadConfig() {
 async function saveConfig(config) {
   if (useMySQL && mysqlPool) {
     try {
-      await mysqlPool.query('UPDATE config SET data = ? WHERE id = 1', [JSON.stringify(config)]);
+      await mysqlPool.query(
+        'INSERT INTO config (id, data) VALUES (1, ?) ON DUPLICATE KEY UPDATE data = ?',
+        [JSON.stringify(config), JSON.stringify(config)]
+      );
       return true;
     } catch (e) {
       console.error('Erro ao salvar config MySQL:', e.message);

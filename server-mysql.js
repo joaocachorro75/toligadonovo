@@ -70,39 +70,35 @@ if (MYSQL_CONFIG.host && MYSQL_CONFIG.user && MYSQL_CONFIG.database) {
   console.log('📦 Usando JSON como banco de dados');
 }
 
-// Tabelas MySQL
-const CREATE_TABLES = `
-CREATE TABLE IF NOT EXISTS config (
-  id INT PRIMARY KEY DEFAULT 1,
-  data JSON NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS products (
-  id VARCHAR(50) PRIMARY KEY,
-  data JSON NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS posts (
-  id VARCHAR(50) PRIMARY KEY,
-  data JSON NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS leads (
-  id VARCHAR(50) PRIMARY KEY,
-  data JSON NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS orders (
-  id VARCHAR(50) PRIMARY KEY,
-  data JSON NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-`;
+// Tabelas MySQL - cada CREATE TABLE separado
+const CREATE_TABLES = [
+  `CREATE TABLE IF NOT EXISTS config (
+    id INT PRIMARY KEY DEFAULT 1,
+    data JSON NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS products (
+    id VARCHAR(50) PRIMARY KEY,
+    data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS posts (
+    id VARCHAR(50) PRIMARY KEY,
+    data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS leads (
+    id VARCHAR(50) PRIMARY KEY,
+    data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS orders (
+    id VARCHAR(50) PRIMARY KEY,
+    data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`
+];
 
 // Inicializa tabelas MySQL
 async function initMySQL() {
@@ -110,7 +106,9 @@ async function initMySQL() {
   
   try {
     const conn = await mysqlPool.getConnection();
-    await conn.query(CREATE_TABLES);
+    for (const sql of CREATE_TABLES) {
+      await conn.query(sql);
+    }
     conn.release();
     console.log('✅ Tabelas MySQL criadas/verificadas');
   } catch (e) {

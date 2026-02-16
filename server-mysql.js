@@ -1197,9 +1197,18 @@ app.post('/webhook/evolution', async (req, res) => {
       const config = await loadConfig();
       
       // Debug: mostrar estrutura da mensagem de áudio
-      console.log('🔍 Estrutura do áudio:', JSON.stringify(message?.audioMessage || message?.streaming || {}, null, 2));
-      console.log('🔍 Tipo de mensagem:', messageType);
-      console.log('🔍 Message completo:', JSON.stringify(message, null, 2).substring(0, 500));
+      const audioDebug = {
+        timestamp: new Date().toISOString(),
+        whatsapp,
+        messageType,
+        audioMessage: message?.audioMessage ? 'presente' : 'ausente',
+        streaming: message?.streaming ? 'presente' : 'ausente',
+        audioUrl: message?.audioMessage?.url || null,
+        directPath: message?.audioMessage?.directPath || null,
+        messageKeys: Object.keys(message || {})
+      };
+      debugLogs.push(audioDebug);
+      console.log('🔍 Debug áudio:', JSON.stringify(audioDebug, null, 2));
       
       // Tentar transcrever o áudio - Evolution API pode enviar de várias formas
       const audioUrl = message?.audioMessage?.url 
@@ -1207,7 +1216,7 @@ app.post('/webhook/evolution', async (req, res) => {
         || message?.audioMessage?.directPath
         || message?.audioMessage?.mediaKey?.url;
       
-      console.log('🔗 URL do áudio extraída:', audioUrl);
+      debugLogs.push({ timestamp: new Date().toISOString(), audioUrl });
       
       if (audioUrl && config.evolution?.enabled) {
         // Avisar que está processando
@@ -1377,6 +1386,18 @@ app.get('/api/conversations', async (req, res) => {
     res.json(rows);
   } catch (e) {
     res.json([]);
+  }
+});
+
+// Rota de debug - mostra últimas requisições de áudio
+let debugLogs = [];
+app.get('/api/debug/audio', (req, res) => {
+  res.json({ 
+    logs: debugLogs.slice(-20),
+    groqKey: GROQ_API_KEY ? 'CONFIGURADA' : 'NÃO CONFIGURADA',
+    elevenKey: ELEVENLABS_API_KEY ? 'CONFIGURADA' : 'NÃO CONFIGURADA'
+  });
+});
   }
 });
 

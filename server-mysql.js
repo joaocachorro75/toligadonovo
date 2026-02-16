@@ -1202,6 +1202,9 @@ function extractInterest(text) {
   return null;
 }
 
+// Controle de mensagens duplicadas
+const recentMessages = new Map();
+
 // Webhook da Evolution API
 app.post('/webhook/evolution', async (req, res) => {
   try {
@@ -1218,15 +1221,8 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // Carregar config para verificar admin
-    const configForCheck = await loadConfig();
-    const adminNumber = configForCheck.whatsapp?.replace('@s.whatsapp.net', '').replace(/\D/g, '');
-    const senderNumber = whatsapp?.replace(/\D/g, '');
-    const isAdmin = adminNumber && senderNumber === adminNumber;
-    
-    // Ignorar mensagens enviadas por mim mesmo (o bot)
-    // EXCETO se for o admin testando
-    if (!whatsapp || (fromMe && !isAdmin)) {
+    // Ignorar mensagens sem WhatsApp
+    if (!whatsapp) {
       return res.json({ ok: true });
     }
     
@@ -1234,6 +1230,17 @@ app.post('/webhook/evolution', async (req, res) => {
     if (whatsapp.includes('@g.us')) {
       return res.json({ ok: true });
     }
+    
+    // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
+    const msgId = data.data?.key?.id;
+    
+    if (recentMessages.has(msgId)) {
+      console.log('Mensagem duplicada ignorada:', msgId);
+      return res.json({ ok: true });
+    }
+    recentMessages.set(msgId, true);
+    // Limpar cache após 10 segundos
+    setTimeout(() => recentMessages.delete(msgId), 10000);
     
     // Verificar se é áudio
     let wasAudio = false; // Marcar se a mensagem original era áudio

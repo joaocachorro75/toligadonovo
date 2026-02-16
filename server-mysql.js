@@ -1235,30 +1235,24 @@ app.post('/webhook/evolution', async (req, res) => {
       const config = await loadConfig();
       
       // Debug: mostrar estrutura da mensagem de áudio
-      const audioDebug = {
+      debugLogs.push({
         timestamp: new Date().toISOString(),
         whatsapp,
         messageType,
         hasAudioMessage: !!message?.audioMessage,
-        audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : [],
-        messageKeys: Object.keys(message || {})
-      };
-      debugLogs.push(audioDebug);
+        audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : []
+      });
       
-      // Evolution API - áudio do WhatsApp está criptografado
-      // Precisa usar a Evolution API para descriptografar
-      const mediaKey = message?.audioMessage?.mediaKey;
-      const directPath = message?.audioMessage?.directPath;
-      const url = message?.audioMessage?.url;
-      const mimetype = message?.audioMessage?.mimetype || 'audio/ogg';
+      // Evolution API - usar getBase64 para baixar mídia
       const messageKey = data.data?.key; // Chave completa da mensagem
-      
       let audioBuffer = null;
       
       if (config.evolution?.enabled) {
         try {
-          // Método 1: Tentar endpoint de base64 da mídia
-          const base64Url = `${config.evolution.baseUrl}/chat/base64Media/${config.evolution.instanceName}`;
+          // Endpoint correto: /chat/getBase64/{instance}
+          const base64Url = `${config.evolution.baseUrl}/chat/getBase64/${config.evolution.instanceName}`;
+          
+          debugLogs.push({ timestamp: new Date().toISOString(), endpoint: base64Url });
           
           const base64Response = await fetch(base64Url, {
             method: 'POST',
@@ -1267,46 +1261,26 @@ app.post('/webhook/evolution', async (req, res) => {
               'apikey': config.evolution.apiKey
             },
             body: JSON.stringify({
-              message: {
-                key: messageKey,
-                message: message
-              }
+              message: messageKey
             })
           });
           
+          debugLogs.push({ timestamp: new Date().toISOString(), status: base64Response.status });
+          
           if (base64Response.ok) {
             const base64Data = await base64Response.json();
+            debugLogs.push({ timestamp: new Date().toISOString(), response: base64Data });
+            
             if (base64Data.base64) {
               audioBuffer = Buffer.from(base64Data.base64, 'base64');
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'base64Media', success: true, size: audioBuffer.length });
-            } else {
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'base64Media', response: base64Data });
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'getBase64', success: true, size: audioBuffer.length });
+            } else if (base64Data.message?.base64) {
+              audioBuffer = Buffer.from(base64Data.message.base64, 'base64');
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'getBase64', success: true, size: audioBuffer.length });
             }
           } else {
             const errorText = await base64Response.text();
-            debugLogs.push({ timestamp: new Date().toISOString(), method: 'base64Media', error: errorText, status: base64Response.status });
-            
-            // Método 2: Tentar downloadMedia
-            const downloadUrl = `${config.evolution.baseUrl}/chat/downloadMedia/${config.evolution.instanceName}`;
-            const downloadResponse = await fetch(downloadUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': config.evolution.apiKey
-              },
-              body: JSON.stringify({
-                mediaKey: mediaKey,
-                directPath: directPath,
-                url: url
-              })
-            });
-            
-            if (downloadResponse.ok) {
-              audioBuffer = await downloadResponse.buffer();
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', success: true, size: audioBuffer.length });
-            } else {
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', error: await downloadResponse.text() });
-            }
+            debugLogs.push({ timestamp: new Date().toISOString(), method: 'getBase64', error: errorText });
           }
         } catch (e) {
           debugLogs.push({ timestamp: new Date().toISOString(), error: e.message });

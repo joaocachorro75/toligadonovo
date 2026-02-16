@@ -853,6 +853,10 @@ function getNextGeminiKey() {
 // Groq Whisper para transcrição de áudio
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
+// ElevenLabs para TTS (Text to Speech)
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel (free)
+
 async function transcribeAudio(audioUrl) {
   try {
     console.log('Transcrevendo áudio...');
@@ -891,6 +895,47 @@ async function transcribeAudio(audioUrl) {
     return null;
   } catch (e) {
     console.error('Erro ao transcrever áudio:', e.message);
+    return null;
+  }
+}
+
+// Texto para fala com ElevenLabs
+async function textToSpeech(text) {
+  try {
+    if (!ELEVENLABS_API_KEY) {
+      console.error('ElevenLabs API key não configurada');
+      return null;
+    }
+
+    console.log('Gerando áudio com ElevenLabs...');
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Erro ElevenLabs:', JSON.stringify(error));
+      return null;
+    }
+
+    const audioBuffer = await response.buffer();
+    console.log('Áudio gerado com sucesso!');
+    return audioBuffer;
+  } catch (e) {
+    console.error('Erro ao gerar áudio:', e.message);
     return null;
   }
 }
@@ -1146,7 +1191,9 @@ app.post('/webhook/evolution', async (req, res) => {
     }
     
     // Verificar se é áudio
+    let wasAudio = false; // Marcar se a mensagem original era áudio
     if (message?.audioMessage || messageType === 'audioMessage' || messageType === 'ptt') {
+      wasAudio = true; // Era áudio
       const config = await loadConfig();
       
       // Tentar transcrever o áudio
@@ -1229,7 +1276,45 @@ app.post('/webhook/evolution', async (req, res) => {
     // Enviar resposta
     const config = await loadConfig();
     if (config.evolution?.enabled) {
-      await sendEvolutionMessage(whatsapp, response);
+      // Se a mensagem original era áudio, responder com áudio
+      if (wasAudio && ELEVENLABS_API_KEY) {
+        console.log('Gerando resposta em áudio...');
+        const audioBuffer = await textToSpeech(response);
+        
+        if (audioBuffer) {
+          // Enviar áudio via Evolution API
+          try {
+            const formData = new FormData();
+            formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'response.mp3');
+            formData.append('mimetype', 'audio/mpeg');
+            
+            const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/sendVoice/${config.evolution.instanceName}`, {
+              method: 'POST',
+              headers: {
+                'apikey': config.evolution.apiKey
+              },
+              body: formData
+            });
+            
+            if (mediaResponse.ok) {
+              console.log('Áudio enviado com sucesso!');
+            } else {
+              // Fallback para texto se falhar enviar áudio
+              console.error('Erro ao enviar áudio, enviando texto...');
+              await sendEvolutionMessage(whatsapp, response);
+            }
+          } catch (e) {
+            console.error('Erro ao enviar áudio:', e.message);
+            await sendEvolutionMessage(whatsapp, response);
+          }
+        } else {
+          // Fallback para texto se falhar gerar áudio
+          await sendEvolutionMessage(whatsapp, response);
+        }
+      } else {
+        // Resposta em texto normal
+        await sendEvolutionMessage(whatsapp, response);
+      }
     }
     
     // Se capturou interesse e nome, salvar como lead

@@ -1279,9 +1279,18 @@ app.post('/webhook/evolution', async (req, res) => {
       // Se a mensagem original era áudio, responder com áudio
       if (wasAudio && ELEVENLABS_API_KEY) {
         console.log('Gerando resposta em áudio...');
-        const audioBuffer = await textToSpeech(response);
+        
+        // Texto introdutório para o áudio
+        const audioIntro = "A Ligadinha vai responder seu áudio! ";
+        const audioText = audioIntro + response;
+        
+        // Gerar áudio com voz feminina (temporariamente)
+        const audioBuffer = await textToSpeech(audioText);
         
         if (audioBuffer) {
+          // Enviar texto explicando + áudio
+          await sendEvolutionMessage(whatsapp, "🎙️ A Ligadinha vai responder seu áudio (temporariamente com voz feminina até fazermos upgrade pra voz masculina)!");
+          
           // Enviar áudio via Evolution API
           try {
             const formData = new FormData();

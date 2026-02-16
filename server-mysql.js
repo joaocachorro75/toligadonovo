@@ -816,10 +816,22 @@ app.post('/api/login', async (req, res) => {
 // APIs - usar variáveis de ambiente para evitar vazamento
 // ============================================
 
-// Modal GLM-5 (principal, grátis e estável)
-// A chave modalresearch_ é pública para pesquisa, disponibilizada pelo Modal Labs
-// Se quiser sua própria chave, configure MODAL_API_KEY nas variáveis de ambiente
-const MODAL_API_KEY = process.env.MODAL_API_KEY || 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0';
+// Modal GLM-5 - múltiplas chaves com rotação
+// Configure MODAL_API_KEYS no Easypanel com chaves separadas por vírgula
+// Exemplo: chave1,chave2,chave3
+const MODAL_KEYS = (process.env.MODAL_API_KEYS || 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0')
+  .split(',')
+  .map(k => k.trim())
+  .filter(k => k.length > 0);
+
+let modalKeyIndex = 0;
+
+function getNextModalKey() {
+  const key = MODAL_KEYS[modalKeyIndex % MODAL_KEYS.length];
+  modalKeyIndex++;
+  return key;
+}
+
 const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
 
 // Gemini (apenas para visão, não usado no atendente)
@@ -929,11 +941,7 @@ async function saveMessage(whatsapp, role, content, name = null, interest = null
   }
 }
 
-// API do Modal (GLM-5 - grátis e estável) - ATENDENTE USA SÓ MODAL
-const MODAL_API_KEY = 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0';
-const MODAL_BASE_URL = 'https://api.us-west-2.modal.direct/v1';
-
-// Função principal - usa Modal GLM-5 (grátis, sem rate limit, sem chaves vazadas)
+// Função principal - usa Modal GLM-5 com rotação de chaves
 async function getAgentResponse(messages, whatsapp, name) {
   // Construir contexto
   let contextPrompt = AGENT_SYSTEM;
@@ -951,13 +959,14 @@ async function getAgentResponse(messages, whatsapp, name) {
       }))
     ];
     
-    console.log('Chamando Modal GLM-5 para atendente...');
+    const apiKey = getNextModalKey();
+    console.log(`Chamando Modal GLM-5 (chave ${modalKeyIndex}/${MODAL_KEYS.length})...`);
     
     const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MODAL_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: 'zai-org/GLM-5-FP8',
@@ -968,6 +977,30 @@ async function getAgentResponse(messages, whatsapp, name) {
     });
     
     const data = await response.json();
+    
+    // Se rate limit, tentar próxima chave
+    if (data.error?.code === 429 || response.status === 429) {
+      console.log('Rate limit, tentando próxima chave...');
+      const nextKey = getNextModalKey();
+      const retryResponse = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${nextKey}`
+        },
+        body: JSON.stringify({
+          model: 'zai-org/GLM-5-FP8',
+          messages: formattedMessages,
+          temperature: 0.9,
+          max_tokens: 500
+        })
+      });
+      const retryData = await retryResponse.json();
+      if (retryData.choices?.[0]?.message?.content) {
+        return retryData.choices[0].message.content;
+      }
+    }
+    
     const responseText = data.choices?.[0]?.message?.content;
     
     if (responseText) {

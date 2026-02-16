@@ -813,15 +813,15 @@ app.post('/api/login', async (req, res) => {
 // ============================================
 // AGENTE DE ATENDIMENTO WHATSAPP
 // ============================================
+// APIs - usar variáveis de ambiente para evitar vazamento
+// ============================================
 
-// Chaves Gemini para o agente
-const GEMINI_KEYS = [
-  'AIzaSyD_T5PyecSScMkIzXlqvr9XripMqGzkkas',
-  'AIzaSyBzTAJ32-wB19cioWVHWPouIzvYm54CwAI',
-  'AIzaSyCZrNs4ACCbFSV47H3P2q4cGzPKl0Y0Tlg',
-  'AIzaSyBtPPsvxCnQSqijn1QYlEGxJJPdHw_heYA',
-  'AIzaSyA6PMwxF4if1aqWM5a55FPONVBVztHcb_Y'
-];
+// Modal GLM-5 (principal, grátis e estável)
+const MODAL_API_KEY = process.env.MODAL_API_KEY || '';
+const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
+
+// Gemini (apenas para visão, não usado no atendente)
+// Para configurar, adicione GEMINI_API_KEY nas variáveis de ambiente do Easypanel
 
 // Sistema do agente
 const AGENT_SYSTEM = `Você é o **Ligadinho**, atendente da To-Ligado.com!
@@ -927,11 +927,11 @@ async function saveMessage(whatsapp, role, content, name = null, interest = null
   }
 }
 
-// API do Modal (GLM-5 - grátis e estável)
+// API do Modal (GLM-5 - grátis e estável) - ATENDENTE USA SÓ MODAL
 const MODAL_API_KEY = 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0';
 const MODAL_BASE_URL = 'https://api.us-west-2.modal.direct/v1';
 
-// Função principal - usa Modal GLM-5 (grátis)
+// Função principal - usa Modal GLM-5 (grátis, sem rate limit, sem chaves vazadas)
 async function getAgentResponse(messages, whatsapp, name) {
   // Construir contexto
   let contextPrompt = AGENT_SYSTEM;
@@ -948,6 +948,8 @@ async function getAgentResponse(messages, whatsapp, name) {
         content: m.content
       }))
     ];
+    
+    console.log('Chamando Modal GLM-5 para atendente...');
     
     const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -967,7 +969,7 @@ async function getAgentResponse(messages, whatsapp, name) {
     const responseText = data.choices?.[0]?.message?.content;
     
     if (responseText) {
-      console.log('Modal GLM-5 respondeu!');
+      console.log('Modal GLM-5 respondeu com sucesso!');
       return responseText;
     }
     
@@ -978,6 +980,8 @@ async function getAgentResponse(messages, whatsapp, name) {
     return null;
   }
 }
+
+// Gemini agora é usado APENAS para visão (análise de imagens)
 
 // Extrair nome da mensagem
 function extractName(text) {

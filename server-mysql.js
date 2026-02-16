@@ -817,7 +817,9 @@ app.post('/api/login', async (req, res) => {
 // ============================================
 
 // Modal GLM-5 (principal, grátis e estável)
-const MODAL_API_KEY = process.env.MODAL_API_KEY || '';
+// A chave modalresearch_ é pública para pesquisa, disponibilizada pelo Modal Labs
+// Se quiser sua própria chave, configure MODAL_API_KEY nas variáveis de ambiente
+const MODAL_API_KEY = process.env.MODAL_API_KEY || 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0';
 const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
 
 // Gemini (apenas para visão, não usado no atendente)

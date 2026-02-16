@@ -1228,6 +1228,17 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
+    // Carregar config para verificar se é o admin
+    const configCheck = await loadConfig();
+    const adminWhatsapp = configCheck.whatsapp?.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    const senderWhatsapp = whatsapp.replace(/\D/g, '');
+    
+    // Ignorar se a mensagem é do próprio admin (evita loop)
+    if (adminWhatsapp && senderWhatsapp === adminWhatsapp) {
+      console.log('Ignorando mensagem do admin para evitar loop');
+      return res.json({ ok: true });
+    }
+    
     // Verificar se é áudio
     let wasAudio = false; // Marcar se a mensagem original era áudio
     if (message?.audioMessage || messageType === 'audioMessage' || messageType === 'ptt') {

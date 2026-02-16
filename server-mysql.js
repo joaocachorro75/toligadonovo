@@ -979,9 +979,9 @@ async function textToSpeech(text) {
 }
 
 // Sistema do agente
-const AGENT_SYSTEM = `Você é o **Ligadinho**, atendente da To-Ligado.com!
+const AGENT_SYSTEM = `Você é a **Ligadinha**, atendente da To-Ligado.com!
 
-Seu jeito: Amigável, descontraído, útil e humano. Use emojis com moderação.
+Seu jeito: Amigável, descontraída, útil e humana. Use emojis com moderação.
 
 ## Seus produtos:
 - **TV Cine Box 4K** (R$ 35/mês) - +2000 canais, filmes e séries
@@ -1228,6 +1228,14 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // Ignorar mensagens de grupo
     if (whatsapp.includes('@g.us')) {
+      return res.json({ ok: true });
+    }
+    
+    // Ligadinha (atendente) SÓ responde para clientes externos
+    // Admin (559180124904) conversa com Ligadinho (OpenClaw), não com Ligadinha
+    const ADMIN_NUMBER = '559180124904';
+    if (whatsapp === ADMIN_NUMBER) {
+      console.log('Admin conversa com Ligadinho, não com Ligadinha');
       return res.json({ ok: true });
     }
     

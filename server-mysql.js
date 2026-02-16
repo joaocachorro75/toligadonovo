@@ -835,7 +835,20 @@ function getNextModalKey() {
 const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
 
 // Gemini (apenas para visão, não usado no atendente)
-// Para configurar, adicione GEMINI_API_KEY nas variáveis de ambiente do Easypanel
+// Configure GEMINI_API_KEYS no Easypanel com chaves separadas por vírgula
+const GEMINI_KEYS = (process.env.GEMINI_API_KEYS || '')
+  .split(',')
+  .map(k => k.trim())
+  .filter(k => k.length > 0);
+
+let geminiKeyIndex = 0;
+
+function getNextGeminiKey() {
+  if (GEMINI_KEYS.length === 0) return null;
+  const key = GEMINI_KEYS[geminiKeyIndex % GEMINI_KEYS.length];
+  geminiKeyIndex++;
+  return key;
+}
 
 // Sistema do agente
 const AGENT_SYSTEM = `Você é o **Ligadinho**, atendente da To-Ligado.com!

@@ -850,6 +850,51 @@ function getNextGeminiKey() {
   return key;
 }
 
+// Groq Whisper para transcrição de áudio
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+
+async function transcribeAudio(audioUrl) {
+  try {
+    console.log('Transcrevendo áudio...');
+    
+    // Baixar o áudio
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) {
+      console.error('Erro ao baixar áudio:', audioResponse.status);
+      return null;
+    }
+    
+    const audioBuffer = await audioResponse.buffer();
+    
+    // Enviar para Groq Whisper
+    const formData = new FormData();
+    formData.append('file', new Blob([audioBuffer]), 'audio.ogg');
+    formData.append('model', 'whisper-large-v3');
+    formData.append('language', 'pt');
+    
+    const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: formData
+    });
+    
+    const data = await whisperResponse.json();
+    
+    if (data.text) {
+      console.log('Áudio transcrito:', data.text);
+      return data.text;
+    }
+    
+    console.error('Erro na transcrição:', JSON.stringify(data));
+    return null;
+  } catch (e) {
+    console.error('Erro ao transcrever áudio:', e.message);
+    return null;
+  }
+}
+
 // Sistema do agente
 const AGENT_SYSTEM = `Você é o **Ligadinho**, atendente da To-Ligado.com!
 
@@ -1102,12 +1147,31 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // Verificar se é áudio
     if (message?.audioMessage || messageType === 'audioMessage' || messageType === 'ptt') {
-      // Por enquanto, pedir texto
       const config = await loadConfig();
-      if (config.evolution?.enabled) {
-        await sendEvolutionMessage(whatsapp, 'Ops! Ainda não consigo ouvir áudios 😅 Pode mandar por texto?');
+      
+      // Tentar transcrever o áudio
+      const audioUrl = message?.audioMessage?.url || message?.streaming?.url;
+      
+      if (audioUrl && config.evolution?.enabled) {
+        // Avisar que está processando
+        await sendEvolutionMessage(whatsapp, '🎧 Ouvindo seu áudio...');
+        
+        const transcribedText = await transcribeAudio(audioUrl);
+        
+        if (transcribedText) {
+          // Usar o texto transcrito como mensagem
+          text = transcribedText;
+          console.log(`💬 Áudio transcrito de ${whatsapp}: ${text}`);
+        } else {
+          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui entender o áudio 😅 Pode mandar por texto?');
+          return res.json({ ok: true });
+        }
+      } else {
+        if (config.evolution?.enabled) {
+          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui receber o áudio 😅 Pode mandar por texto?');
+        }
+        return res.json({ ok: true });
       }
-      return res.json({ ok: true });
     }
     
     if (!text) {

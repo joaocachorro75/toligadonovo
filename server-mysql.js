@@ -1251,32 +1251,55 @@ app.post('/webhook/evolution', async (req, res) => {
         whatsapp,
         messageType,
         hasAudioMessage: !!message?.audioMessage,
-        hasStreaming: !!message?.streaming,
         audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : [],
         messageKeys: Object.keys(message || {})
       };
       debugLogs.push(audioDebug);
-      console.log('🔍 Debug áudio:', JSON.stringify(audioDebug, null, 2));
       
-      // Evolution API - usar mediaKey pra baixar áudio
+      // Evolution API - áudio do WhatsApp está criptografado
+      // Precisa usar a Evolution API para descriptografar
       const mediaKey = message?.audioMessage?.mediaKey;
       const directPath = message?.audioMessage?.directPath;
       const url = message?.audioMessage?.url;
+      const mimetype = message?.audioMessage?.mimetype || 'audio/ogg';
+      const messageKey = data.data?.key; // Chave completa da mensagem
       
-      // Tentar várias formas de obter o áudio
       let audioBuffer = null;
-      let audioUrl = null;
       
       if (config.evolution?.enabled) {
-        // Método 1: URL direta
-        if (url) {
-          audioUrl = url;
-          debugLogs.push({ timestamp: new Date().toISOString(), method: 'url', audioUrl });
-        }
-        // Método 2: Usar Evolution API para baixar mídia
-        else if (directPath || mediaKey) {
-          try {
-            const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/downloadMedia/${config.evolution.instanceName}`, {
+        try {
+          // Método 1: Tentar endpoint de base64 da mídia
+          const base64Url = `${config.evolution.baseUrl}/chat/base64Media/${config.evolution.instanceName}`;
+          
+          const base64Response = await fetch(base64Url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': config.evolution.apiKey
+            },
+            body: JSON.stringify({
+              message: {
+                key: messageKey,
+                message: message
+              }
+            })
+          });
+          
+          if (base64Response.ok) {
+            const base64Data = await base64Response.json();
+            if (base64Data.base64) {
+              audioBuffer = Buffer.from(base64Data.base64, 'base64');
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'base64Media', success: true, size: audioBuffer.length });
+            } else {
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'base64Media', response: base64Data });
+            }
+          } else {
+            const errorText = await base64Response.text();
+            debugLogs.push({ timestamp: new Date().toISOString(), method: 'base64Media', error: errorText, status: base64Response.status });
+            
+            // Método 2: Tentar downloadMedia
+            const downloadUrl = `${config.evolution.baseUrl}/chat/downloadMedia/${config.evolution.instanceName}`;
+            const downloadResponse = await fetch(downloadUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -1284,30 +1307,31 @@ app.post('/webhook/evolution', async (req, res) => {
               },
               body: JSON.stringify({
                 mediaKey: mediaKey,
-                directPath: directPath
+                directPath: directPath,
+                url: url
               })
             });
             
-            if (mediaResponse.ok) {
-              audioBuffer = await mediaResponse.buffer();
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', success: true });
+            if (downloadResponse.ok) {
+              audioBuffer = await downloadResponse.buffer();
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', success: true, size: audioBuffer.length });
+            } else {
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', error: await downloadResponse.text() });
             }
-          } catch (e) {
-            debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', error: e.message });
           }
+        } catch (e) {
+          debugLogs.push({ timestamp: new Date().toISOString(), error: e.message });
         }
       }
       
-      debugLogs.push({ timestamp: new Date().toISOString(), audioUrl, hasBuffer: !!audioBuffer });
+      debugLogs.push({ timestamp: new Date().toISOString(), hasBuffer: !!audioBuffer, bufferSize: audioBuffer?.length });
       
-      if ((audioUrl || audioBuffer) && config.evolution?.enabled) {
+      if (audioBuffer && config.evolution?.enabled) {
         // Avisar que está processando
         await sendEvolutionMessage(whatsapp, '🎧 Ouvindo seu áudio...');
         
-        // Transcrever usando URL ou buffer
-        const transcribedText = audioBuffer 
-          ? await transcribeAudioBuffer(audioBuffer)
-          : await transcribeAudio(audioUrl);
+        // Transcrever o buffer
+        const transcribedText = await transcribeAudioBuffer(audioBuffer);
         
         if (transcribedText) {
           // Usar o texto transcrito como mensagem
@@ -1318,9 +1342,9 @@ app.post('/webhook/evolution', async (req, res) => {
           return res.json({ ok: true });
         }
       } else {
-        debugLogs.push({ timestamp: new Date().toISOString(), error: 'Sem áudio', audioUrl, hasBuffer: !!audioBuffer });
+        debugLogs.push({ timestamp: new Date().toISOString(), error: 'Não consegui baixar áudio' });
         if (config.evolution?.enabled) {
-          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui receber o áudio 😅 Pode mandar por texto?');
+          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui baixar o áudio 😅 Pode mandar por texto?');
         }
         return res.json({ ok: true });
       }

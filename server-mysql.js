@@ -722,7 +722,7 @@ app.post('/api/leads', async (req, res) => {
   // Notificar no WhatsApp quando novo lead
   const config = await loadConfig();
   if (config.evolution?.enabled && config.whatsapp) {
-    const msg = `🆕 *Novo Lead!*\n\n👤 Nome: ${lead.name || 'Não informado'}\n📧 Email: ${lead.email || 'Não informado'}\n📱 Telefone: ${lead.phone || 'Não informado'}\n\n💬 Mensagem: ${lead.message || 'Sem mensagem'}`;
+    const msg = `🆕 *Novo Lead!*\n\n👤 Nome: ${lead.name || 'Não informado'}\n📱 WhatsApp: ${lead.phone || lead.whatsapp || 'Não informado'}`;
     await sendEvolutionMessage(config.whatsapp, msg);
   }
   

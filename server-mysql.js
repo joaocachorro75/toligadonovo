@@ -899,6 +899,44 @@ async function transcribeAudio(audioUrl) {
   }
 }
 
+// Transcrever áudio de um buffer (para Evolution API)
+async function transcribeAudioBuffer(audioBuffer) {
+  try {
+    if (!GROQ_API_KEY) {
+      console.error('Groq API key não configurada');
+      return null;
+    }
+
+    console.log('Transcrevendo áudio do buffer...');
+    
+    const formData = new FormData();
+    formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
+    formData.append('model', 'whisper-large-v3');
+    formData.append('language', 'pt');
+    
+    const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: formData
+    });
+    
+    const data = await whisperResponse.json();
+    
+    if (data.text) {
+      console.log('Áudio transcrito:', data.text);
+      return data.text;
+    }
+    
+    console.error('Erro na transcrição:', JSON.stringify(data));
+    return null;
+  } catch (e) {
+    console.error('Erro ao transcrever áudio do buffer:', e.message);
+    return null;
+  }
+}
+
 // Texto para fala com ElevenLabs
 async function textToSpeech(text) {
   try {
@@ -1201,28 +1239,64 @@ app.post('/webhook/evolution', async (req, res) => {
         timestamp: new Date().toISOString(),
         whatsapp,
         messageType,
-        audioMessage: message?.audioMessage ? 'presente' : 'ausente',
-        streaming: message?.streaming ? 'presente' : 'ausente',
-        audioUrl: message?.audioMessage?.url || null,
-        directPath: message?.audioMessage?.directPath || null,
+        hasAudioMessage: !!message?.audioMessage,
+        hasStreaming: !!message?.streaming,
+        audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : [],
         messageKeys: Object.keys(message || {})
       };
       debugLogs.push(audioDebug);
       console.log('🔍 Debug áudio:', JSON.stringify(audioDebug, null, 2));
       
-      // Tentar transcrever o áudio - Evolution API pode enviar de várias formas
-      const audioUrl = message?.audioMessage?.url 
-        || message?.streaming?.url 
-        || message?.audioMessage?.directPath
-        || message?.audioMessage?.mediaKey?.url;
+      // Evolution API - usar mediaKey pra baixar áudio
+      const mediaKey = message?.audioMessage?.mediaKey;
+      const directPath = message?.audioMessage?.directPath;
+      const url = message?.audioMessage?.url;
       
-      debugLogs.push({ timestamp: new Date().toISOString(), audioUrl });
+      // Tentar várias formas de obter o áudio
+      let audioBuffer = null;
+      let audioUrl = null;
       
-      if (audioUrl && config.evolution?.enabled) {
+      if (config.evolution?.enabled) {
+        // Método 1: URL direta
+        if (url) {
+          audioUrl = url;
+          debugLogs.push({ timestamp: new Date().toISOString(), method: 'url', audioUrl });
+        }
+        // Método 2: Usar Evolution API para baixar mídia
+        else if (directPath || mediaKey) {
+          try {
+            const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/downloadMedia/${config.evolution.instanceName}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': config.evolution.apiKey
+              },
+              body: JSON.stringify({
+                mediaKey: mediaKey,
+                directPath: directPath
+              })
+            });
+            
+            if (mediaResponse.ok) {
+              audioBuffer = await mediaResponse.buffer();
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', success: true });
+            }
+          } catch (e) {
+            debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadMedia', error: e.message });
+          }
+        }
+      }
+      
+      debugLogs.push({ timestamp: new Date().toISOString(), audioUrl, hasBuffer: !!audioBuffer });
+      
+      if ((audioUrl || audioBuffer) && config.evolution?.enabled) {
         // Avisar que está processando
         await sendEvolutionMessage(whatsapp, '🎧 Ouvindo seu áudio...');
         
-        const transcribedText = await transcribeAudio(audioUrl);
+        // Transcrever usando URL ou buffer
+        const transcribedText = audioBuffer 
+          ? await transcribeAudioBuffer(audioBuffer)
+          : await transcribeAudio(audioUrl);
         
         if (transcribedText) {
           // Usar o texto transcrito como mensagem
@@ -1233,6 +1307,7 @@ app.post('/webhook/evolution', async (req, res) => {
           return res.json({ ok: true });
         }
       } else {
+        debugLogs.push({ timestamp: new Date().toISOString(), error: 'Sem áudio', audioUrl, hasBuffer: !!audioBuffer });
         if (config.evolution?.enabled) {
           await sendEvolutionMessage(whatsapp, 'Ops! Não consegui receber o áudio 😅 Pode mandar por texto?');
         }

@@ -749,7 +749,7 @@ app.post('/api/orders', async (req, res) => {
   // Notificar no WhatsApp quando nova venda
   const config = await loadConfig();
   if (config.evolution?.enabled && config.whatsapp) {
-    const msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}\n\n📧 Email: ${order.customerEmail || 'Não informado'}`;
+    const msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}`;
     await sendEvolutionMessage(config.whatsapp, msg);
   }
   

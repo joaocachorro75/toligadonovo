@@ -1473,8 +1473,6 @@ app.get('/api/debug/audio', (req, res) => {
     elevenKey: ELEVENLABS_API_KEY ? 'CONFIGURADA' : 'NÃO CONFIGURADA'
   });
 });
-  }
-});
 
 // Rota para ver uma conversa
 app.get('/api/conversations/:whatsapp', async (req, res) => {

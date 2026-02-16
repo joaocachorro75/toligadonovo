@@ -1231,6 +1231,13 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
+    // CRÍTICO: Ignorar mensagens que o próprio bot enviou (fromMe: true)
+    // Isso evita loop infinito onde o bot responde às próprias mensagens
+    if (fromMe) {
+      console.log('Ignorando mensagem do próprio bot (fromMe)');
+      return res.json({ ok: true });
+    }
+    
     // Ligadinha (atendente) SÓ responde para clientes externos
     // Admin (559180124904) conversa com Ligadinho (OpenClaw), não com Ligadinha
     const ADMIN_NUMBER = '559180124904';

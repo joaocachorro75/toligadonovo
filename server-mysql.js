@@ -1250,105 +1250,15 @@ app.post('/webhook/evolution', async (req, res) => {
     // Limpar cache após 10 segundos
     setTimeout(() => recentMessages.delete(msgId), 10000);
     
-    // Verificar se é áudio
-    let wasAudio = false; // Marcar se a mensagem original era áudio
+    // Se for áudio, pedir texto (simplificado)
     if (message?.audioMessage || messageType === 'audioMessage' || messageType === 'ptt') {
-      wasAudio = true; // Era áudio
       const config = await loadConfig();
+      console.log(`Áudio recebido de ${whatsapp}, pedindo texto...`);
       
-      // Debug: mostrar estrutura da mensagem de áudio
-      debugLogs.push({
-        timestamp: new Date().toISOString(),
-        whatsapp,
-        messageType,
-        hasAudioMessage: !!message?.audioMessage,
-        audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : [],
-        hasBase64: !!message?.audioMessage?.base64
-      });
-      
-      // Tentar obter áudio
-      let audioBuffer = null;
-      const base64Audio = message?.audioMessage?.base64;
-      
-      if (base64Audio) {
-        // Áudio veio em base64 no webhook
-        audioBuffer = Buffer.from(base64Audio, 'base64');
-        debugLogs.push({ timestamp: new Date().toISOString(), method: 'webhookBase64', success: true, size: audioBuffer.length });
-      } else {
-        // Baixar áudio via Evolution API
-        debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadViaAPI', attempting: true });
-        
-        try {
-          // Usar o endpoint de download de mídia
-          const mediaKey = message?.audioMessage?.mediaKey;
-          const directPath = message?.audioMessage?.directPath;
-          const url = message?.audioMessage?.url;
-          
-          // Tentar baixar diretamente a URL (pode funcionar em alguns casos)
-          if (url) {
-            const audioResponse = await fetch(url);
-            if (audioResponse.ok) {
-              audioBuffer = await audioResponse.buffer();
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'directURL', success: true, size: audioBuffer.length });
-            }
-          }
-          
-          // Se não funcionou, tentar Evolution API
-          if (!audioBuffer && config.evolution?.enabled) {
-            // Buscar a mensagem completa com mídia
-            const findMsgUrl = `${config.evolution.baseUrl}/chat/findMessages/${config.evolution.instanceName}`;
-            const findResponse = await fetch(findMsgUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': config.evolution.apiKey
-              },
-              body: JSON.stringify({
-                where: {
-                  key: {
-                    id: data.data?.key?.id
-                  }
-                }
-              })
-            });
-            
-            if (findResponse.ok) {
-              const msgData = await findResponse.json();
-              if (msgData[0]?.message?.audioMessage?.base64) {
-                audioBuffer = Buffer.from(msgData[0].message.audioMessage.base64, 'base64');
-                debugLogs.push({ timestamp: new Date().toISOString(), method: 'findMessages', success: true, size: audioBuffer.length });
-              }
-            }
-          }
-        } catch (e) {
-          debugLogs.push({ timestamp: new Date().toISOString(), error: e.message });
-        }
+      if (config.evolution?.enabled) {
+        await sendEvolutionMessage(whatsapp, 'Oi! 😊 Recebi seu áudio, mas por enquanto só atendo por texto! Pode mandar a mensagem escrita?');
       }
-      
-      debugLogs.push({ timestamp: new Date().toISOString(), hasBuffer: !!audioBuffer, bufferSize: audioBuffer?.length });
-      
-      if (audioBuffer && config.evolution?.enabled) {
-        // Avisar que está processando
-        await sendEvolutionMessage(whatsapp, '🎧 Ouvindo seu áudio...');
-        
-        // Transcrever o buffer
-        const transcribedText = await transcribeAudioBuffer(audioBuffer);
-        
-        if (transcribedText) {
-          // Usar o texto transcrito como mensagem
-          text = transcribedText;
-          console.log(`💬 Áudio transcrito de ${whatsapp}: ${text}`);
-        } else {
-          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui entender o áudio 😅 Pode mandar por texto?');
-          return res.json({ ok: true });
-        }
-      } else {
-        debugLogs.push({ timestamp: new Date().toISOString(), error: 'Não consegui baixar áudio' });
-        if (config.evolution?.enabled) {
-          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui baixar o áudio 😅 Pode mandar por texto?');
-        }
-        return res.json({ ok: true });
-      }
+      return res.json({ ok: true });
     }
     
     if (!text) {
@@ -1406,54 +1316,8 @@ app.post('/webhook/evolution', async (req, res) => {
     // Enviar resposta
     const config = await loadConfig();
     if (config.evolution?.enabled) {
-      // Se a mensagem original era áudio, responder com áudio
-      if (wasAudio && ELEVENLABS_API_KEY) {
-        console.log('Gerando resposta em áudio...');
-        
-        // Texto introdutório para o áudio
-        const audioIntro = "A Ligadinha vai responder seu áudio! ";
-        const audioText = audioIntro + response;
-        
-        // Gerar áudio com voz feminina (temporariamente)
-        const audioBuffer = await textToSpeech(audioText);
-        
-        if (audioBuffer) {
-          // Enviar texto explicando + áudio
-          await sendEvolutionMessage(whatsapp, "🎙️ A Ligadinha vai responder seu áudio (temporariamente com voz feminina até fazermos upgrade pra voz masculina)!");
-          
-          // Enviar áudio via Evolution API
-          try {
-            const formData = new FormData();
-            formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'response.mp3');
-            formData.append('mimetype', 'audio/mpeg');
-            
-            const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/sendVoice/${config.evolution.instanceName}`, {
-              method: 'POST',
-              headers: {
-                'apikey': config.evolution.apiKey
-              },
-              body: formData
-            });
-            
-            if (mediaResponse.ok) {
-              console.log('Áudio enviado com sucesso!');
-            } else {
-              // Fallback para texto se falhar enviar áudio
-              console.error('Erro ao enviar áudio, enviando texto...');
-              await sendEvolutionMessage(whatsapp, response);
-            }
-          } catch (e) {
-            console.error('Erro ao enviar áudio:', e.message);
-            await sendEvolutionMessage(whatsapp, response);
-          }
-        } else {
-          // Fallback para texto se falhar gerar áudio
-          await sendEvolutionMessage(whatsapp, response);
-        }
-      } else {
-        // Resposta em texto normal
-        await sendEvolutionMessage(whatsapp, response);
-      }
+      // Resposta em texto normal
+      await sendEvolutionMessage(whatsapp, response);
     }
     
     // Se capturou interesse e nome, salvar como lead

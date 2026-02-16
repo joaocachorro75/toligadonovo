@@ -1254,51 +1254,19 @@ app.post('/webhook/evolution', async (req, res) => {
         whatsapp,
         messageType,
         hasAudioMessage: !!message?.audioMessage,
-        audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : []
+        audioMessageKeys: message?.audioMessage ? Object.keys(message.audioMessage) : [],
+        hasBase64: !!message?.audioMessage?.base64
       });
       
-      // Evolution API - usar getBase64 para baixar mídia
-      const messageKey = data.data?.key; // Chave completa da mensagem
+      // Com webhookBase64: true, a Evolution API envia o áudio em base64
       let audioBuffer = null;
+      const base64Audio = message?.audioMessage?.base64;
       
-      if (config.evolution?.enabled) {
-        try {
-          // Endpoint correto: /chat/getBase64/{instance}
-          const base64Url = `${config.evolution.baseUrl}/chat/getBase64/${config.evolution.instanceName}`;
-          
-          debugLogs.push({ timestamp: new Date().toISOString(), endpoint: base64Url });
-          
-          const base64Response = await fetch(base64Url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': config.evolution.apiKey
-            },
-            body: JSON.stringify({
-              message: messageKey
-            })
-          });
-          
-          debugLogs.push({ timestamp: new Date().toISOString(), status: base64Response.status });
-          
-          if (base64Response.ok) {
-            const base64Data = await base64Response.json();
-            debugLogs.push({ timestamp: new Date().toISOString(), response: base64Data });
-            
-            if (base64Data.base64) {
-              audioBuffer = Buffer.from(base64Data.base64, 'base64');
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'getBase64', success: true, size: audioBuffer.length });
-            } else if (base64Data.message?.base64) {
-              audioBuffer = Buffer.from(base64Data.message.base64, 'base64');
-              debugLogs.push({ timestamp: new Date().toISOString(), method: 'getBase64', success: true, size: audioBuffer.length });
-            }
-          } else {
-            const errorText = await base64Response.text();
-            debugLogs.push({ timestamp: new Date().toISOString(), method: 'getBase64', error: errorText });
-          }
-        } catch (e) {
-          debugLogs.push({ timestamp: new Date().toISOString(), error: e.message });
-        }
+      if (base64Audio) {
+        audioBuffer = Buffer.from(base64Audio, 'base64');
+        debugLogs.push({ timestamp: new Date().toISOString(), method: 'webhookBase64', success: true, size: audioBuffer.length });
+      } else {
+        debugLogs.push({ timestamp: new Date().toISOString(), error: 'Áudio não veio em base64 no webhook' });
       }
       
       debugLogs.push({ timestamp: new Date().toISOString(), hasBuffer: !!audioBuffer, bufferSize: audioBuffer?.length });

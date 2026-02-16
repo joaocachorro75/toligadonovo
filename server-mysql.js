@@ -719,11 +719,18 @@ app.post('/api/leads', async (req, res) => {
   const lead = req.body;
   await saveLead(lead);
   
-  // Notificar no WhatsApp quando novo lead
   const config = await loadConfig();
+  
+  // Notificar admin no WhatsApp
   if (config.evolution?.enabled && config.whatsapp) {
     const msg = `🆕 *Novo Lead!*\n\n👤 Nome: ${lead.name || 'Não informado'}\n📱 WhatsApp: ${lead.phone || lead.whatsapp || 'Não informado'}`;
     await sendEvolutionMessage(config.whatsapp, msg);
+  }
+  
+  // Enviar boas-vindas para o lead
+  if (config.evolution?.enabled && (lead.phone || lead.whatsapp)) {
+    const welcomeMsg = config.evolution?.welcomeMessage?.replace('{produto}', 'nossos serviços') || 'Olá! Recebemos seu contato. Em breve retornaremos!';
+    await sendEvolutionMessage(lead.phone || lead.whatsapp, welcomeMsg);
   }
   
   res.json({ success: true });
@@ -746,11 +753,18 @@ app.post('/api/orders', async (req, res) => {
   const order = req.body;
   await saveOrder(order);
   
-  // Notificar no WhatsApp quando nova venda
   const config = await loadConfig();
+  
+  // Notificar admin no WhatsApp
   if (config.evolution?.enabled && config.whatsapp) {
     const msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}`;
     await sendEvolutionMessage(config.whatsapp, msg);
+  }
+  
+  // Enviar confirmação para o comprador
+  if (config.evolution?.enabled && order.customerWhatsapp) {
+    const confirmMsg = `✅ *Pedido Confirmado!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}\n\nObrigado pela preferência!`;
+    await sendEvolutionMessage(order.customerWhatsapp, confirmMsg);
   }
   
   res.json({ success: true });

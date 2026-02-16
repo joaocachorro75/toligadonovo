@@ -1218,8 +1218,15 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
+    // Carregar config para verificar admin
+    const configForCheck = await loadConfig();
+    const adminNumber = configForCheck.whatsapp?.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    const senderNumber = whatsapp?.replace(/\D/g, '');
+    const isAdmin = adminNumber && senderNumber === adminNumber;
+    
     // Ignorar mensagens enviadas por mim mesmo (o bot)
-    if (!whatsapp || fromMe) {
+    // EXCETO se for o admin testando
+    if (!whatsapp || (fromMe && !isAdmin)) {
       return res.json({ ok: true });
     }
     

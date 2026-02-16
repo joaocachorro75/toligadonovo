@@ -927,8 +927,45 @@ async function saveMessage(whatsapp, role, content, name = null, interest = null
   }
 }
 
+// Chamar Modal GLM-5 (fallback gratuito)
+const MODAL_API_KEY = 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0';
+const MODAL_BASE_URL = 'https://api.us-west-2.modal.direct/v1';
+
+async function getModalResponse(messages, systemPrompt) {
+  try {
+    // Formatar mensagens para OpenAI-compatible API
+    const formattedMessages = [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(m => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content
+      }))
+    ];
+    
+    const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${MODAL_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'zai-org/GLM-5-FP8',
+        messages: formattedMessages,
+        temperature: 0.9,
+        max_tokens: 500
+      })
+    });
+    
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch (e) {
+    console.error('Erro no Modal:', e.message);
+    return null;
+  }
+}
+
 // Chamar Gemini para resposta
-async function getAgentResponse(messages, whatsapp, name) {
+async function getGeminiResponse(messages, whatsapp, name) {
   const apiKey = GEMINI_KEYS[Math.floor(Math.random() * GEMINI_KEYS.length)];
   
   // Construir contexto
@@ -970,15 +1007,46 @@ async function getAgentResponse(messages, whatsapp, name) {
     // Verificar se houve erro na API
     if (data.error) {
       console.error('Erro na API Gemini:', JSON.stringify(data.error));
-      return null; // Retorna null para indicar erro
+      return null;
     }
     
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return responseText || null; // Retorna null se não tiver resposta
+    return responseText || null;
   } catch (e) {
     console.error('Erro no Gemini:', e.message);
-    return null; // Retorna null para indicar erro
+    return null;
   }
+}
+
+// Função principal - tenta Gemini, se falhar usa Modal
+async function getAgentResponse(messages, whatsapp, name) {
+  // Construir contexto
+  let contextPrompt = AGENT_SYSTEM;
+  if (name) {
+    contextPrompt += `\n\nO nome da pessoa é: ${name}`;
+  }
+  
+  // Tentar Gemini primeiro
+  console.log('Tentando Gemini...');
+  const geminiResponse = await getGeminiResponse(messages, whatsapp, name);
+  
+  if (geminiResponse) {
+    console.log('Gemini respondeu!');
+    return geminiResponse;
+  }
+  
+  // Se Gemini falhou, usar Modal
+  console.log('Gemini falhou, usando Modal GLM-5...');
+  const modalResponse = await getModalResponse(messages, contextPrompt);
+  
+  if (modalResponse) {
+    console.log('Modal respondeu!');
+    return modalResponse;
+  }
+  
+  // Se ambos falharam
+  console.error('Todas as APIs falharam!');
+  return null;
 }
 
 // Extrair nome da mensagem

@@ -1258,15 +1258,63 @@ app.post('/webhook/evolution', async (req, res) => {
         hasBase64: !!message?.audioMessage?.base64
       });
       
-      // Com webhookBase64: true, a Evolution API envia o áudio em base64
+      // Tentar obter áudio
       let audioBuffer = null;
       const base64Audio = message?.audioMessage?.base64;
       
       if (base64Audio) {
+        // Áudio veio em base64 no webhook
         audioBuffer = Buffer.from(base64Audio, 'base64');
         debugLogs.push({ timestamp: new Date().toISOString(), method: 'webhookBase64', success: true, size: audioBuffer.length });
       } else {
-        debugLogs.push({ timestamp: new Date().toISOString(), error: 'Áudio não veio em base64 no webhook' });
+        // Baixar áudio via Evolution API
+        debugLogs.push({ timestamp: new Date().toISOString(), method: 'downloadViaAPI', attempting: true });
+        
+        try {
+          // Usar o endpoint de download de mídia
+          const mediaKey = message?.audioMessage?.mediaKey;
+          const directPath = message?.audioMessage?.directPath;
+          const url = message?.audioMessage?.url;
+          
+          // Tentar baixar diretamente a URL (pode funcionar em alguns casos)
+          if (url) {
+            const audioResponse = await fetch(url);
+            if (audioResponse.ok) {
+              audioBuffer = await audioResponse.buffer();
+              debugLogs.push({ timestamp: new Date().toISOString(), method: 'directURL', success: true, size: audioBuffer.length });
+            }
+          }
+          
+          // Se não funcionou, tentar Evolution API
+          if (!audioBuffer && config.evolution?.enabled) {
+            // Buscar a mensagem completa com mídia
+            const findMsgUrl = `${config.evolution.baseUrl}/chat/findMessages/${config.evolution.instanceName}`;
+            const findResponse = await fetch(findMsgUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': config.evolution.apiKey
+              },
+              body: JSON.stringify({
+                where: {
+                  key: {
+                    id: data.data?.key?.id
+                  }
+                }
+              })
+            });
+            
+            if (findResponse.ok) {
+              const msgData = await findResponse.json();
+              if (msgData[0]?.message?.audioMessage?.base64) {
+                audioBuffer = Buffer.from(msgData[0].message.audioMessage.base64, 'base64');
+                debugLogs.push({ timestamp: new Date().toISOString(), method: 'findMessages', success: true, size: audioBuffer.length });
+              }
+            }
+          }
+        } catch (e) {
+          debugLogs.push({ timestamp: new Date().toISOString(), error: e.message });
+        }
       }
       
       debugLogs.push({ timestamp: new Date().toISOString(), hasBuffer: !!audioBuffer, bufferSize: audioBuffer?.length });

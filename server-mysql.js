@@ -1218,24 +1218,13 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // Ignorar mensagens enviadas por mim mesmo
+    // Ignorar mensagens enviadas por mim mesmo (o bot)
     if (!whatsapp || fromMe) {
       return res.json({ ok: true });
     }
     
     // Ignorar mensagens de grupo
     if (whatsapp.includes('@g.us')) {
-      return res.json({ ok: true });
-    }
-    
-    // Carregar config para verificar se é o admin
-    const configCheck = await loadConfig();
-    const adminWhatsapp = configCheck.whatsapp?.replace('@s.whatsapp.net', '').replace(/\D/g, '');
-    const senderWhatsapp = whatsapp.replace(/\D/g, '');
-    
-    // Ignorar se a mensagem é do próprio admin (evita loop)
-    if (adminWhatsapp && senderWhatsapp === adminWhatsapp) {
-      console.log('Ignorando mensagem do admin para evitar loop');
       return res.json({ ok: true });
     }
     

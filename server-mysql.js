@@ -870,24 +870,23 @@ async function transcribeAudio(audioUrl) {
     
     const audioBuffer = await audioResponse.buffer();
     
-    // Enviar para Groq Whisper
+    // Usar ElevenLabs Speech-to-Text (mais preciso)
     const formData = new FormData();
-    formData.append('file', new Blob([audioBuffer]), 'audio.ogg');
-    formData.append('model', 'whisper-large-v3');
-    formData.append('language', 'pt');
+    formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
+    formData.append('model_id', 'scribe_v1');
     
-    const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    const sttResponse = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`
+        'xi-api-key': ELEVENLABS_API_KEY
       },
       body: formData
     });
     
-    const data = await whisperResponse.json();
+    const data = await sttResponse.json();
     
     if (data.text) {
-      console.log('Áudio transcrito:', data.text);
+      console.log('Áudio transcrito (ElevenLabs):', data.text);
       return data.text;
     }
     
@@ -899,33 +898,33 @@ async function transcribeAudio(audioUrl) {
   }
 }
 
-// Transcrever áudio de um buffer (para Evolution API)
+// Transcrever áudio de um buffer usando ElevenLabs (mais preciso)
 async function transcribeAudioBuffer(audioBuffer) {
   try {
-    if (!GROQ_API_KEY) {
-      console.error('Groq API key não configurada');
+    if (!ELEVENLABS_API_KEY) {
+      console.error('ElevenLabs API key não configurada');
       return null;
     }
 
-    console.log('Transcrevendo áudio do buffer...');
+    console.log('Transcrevendo áudio com ElevenLabs...');
     
     const formData = new FormData();
     formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
-    formData.append('model', 'whisper-large-v3');
-    formData.append('language', 'pt');
+    formData.append('model_id', 'scribe_v1');
     
-    const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    const sttResponse = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`
+        'xi-api-key': ELEVENLABS_API_KEY
       },
       body: formData
     });
     
-    const data = await whisperResponse.json();
+    const data = await sttResponse.json();
     
     if (data.text) {
-      console.log('Áudio transcrito:', data.text);
+      console.log('Áudio transcrito (ElevenLabs):', data.text);
+      console.log('Idioma detectado:', data.language_code, `(${(data.language_probability * 100).toFixed(1)}%)`);
       return data.text;
     }
     
@@ -1257,15 +1256,43 @@ app.post('/webhook/evolution', async (req, res) => {
     // Limpar cache após 10 segundos
     setTimeout(() => recentMessages.delete(msgId), 10000);
     
-    // Se for áudio, pedir texto (simplificado)
+    // Se for áudio, transcrever e responder em áudio
+    let wasAudio = false; // Marcar se a mensagem original era áudio
     if (message?.audioMessage || messageType === 'audioMessage' || messageType === 'ptt') {
+      wasAudio = true;
       const config = await loadConfig();
-      console.log(`Áudio recebido de ${whatsapp}, pedindo texto...`);
+      console.log(`Áudio recebido de ${whatsapp}, processando...`);
       
-      if (config.evolution?.enabled) {
-        await sendEvolutionMessage(whatsapp, 'Oi! 😊 Recebi seu áudio, mas por enquanto só atendo por texto! Pode mandar a mensagem escrita?');
+      // Baixar áudio da URL direta
+      const audioUrl = message?.audioMessage?.url;
+      let transcribedText = null;
+      
+      if (audioUrl) {
+        try {
+          // Baixar áudio diretamente
+          const audioResponse = await fetch(audioUrl);
+          if (audioResponse.ok) {
+            const audioBuffer = await audioResponse.buffer();
+            console.log(`Áudio baixado: ${audioBuffer.length} bytes`);
+            
+            // Transcrever com ElevenLabs
+            transcribedText = await transcribeAudioBuffer(audioBuffer);
+          }
+        } catch (e) {
+          console.error('Erro ao processar áudio:', e.message);
+        }
       }
-      return res.json({ ok: true });
+      
+      if (!transcribedText) {
+        if (config.evolution?.enabled) {
+          await sendEvolutionMessage(whatsapp, 'Ops! Não consegui entender o áudio 😅 Pode mandar por texto?');
+        }
+        return res.json({ ok: true });
+      }
+      
+      // Usar texto transcrito como mensagem
+      text = transcribedText;
+      console.log(`💬 Áudio transcrito de ${whatsapp}: ${text}`);
     }
     
     if (!text) {
@@ -1323,8 +1350,47 @@ app.post('/webhook/evolution', async (req, res) => {
     // Enviar resposta
     const config = await loadConfig();
     if (config.evolution?.enabled) {
-      // Resposta em texto normal
-      await sendEvolutionMessage(whatsapp, response);
+      // Se a mensagem original era áudio, responder com áudio
+      if (wasAudio && ELEVENLABS_API_KEY) {
+        console.log('Gerando resposta em áudio com ElevenLabs...');
+        
+        // Gerar áudio com ElevenLabs
+        const audioBuffer = await textToSpeech(response);
+        
+        if (audioBuffer) {
+          // Enviar áudio via Evolution API
+          try {
+            const formData = new FormData();
+            formData.append('number', whatsapp);
+            formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'response.mp3');
+            formData.append('mimetype', 'audio/mpeg');
+            
+            const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/sendVoice/${config.evolution.instanceName}`, {
+              method: 'POST',
+              headers: {
+                'apikey': config.evolution.apiKey
+              },
+              body: formData
+            });
+            
+            if (mediaResponse.ok) {
+              console.log('✅ Áudio enviado com sucesso!');
+            } else {
+              console.error('Erro ao enviar áudio, enviando texto...');
+              await sendEvolutionMessage(whatsapp, response);
+            }
+          } catch (e) {
+            console.error('Erro ao enviar áudio:', e.message);
+            await sendEvolutionMessage(whatsapp, response);
+          }
+        } else {
+          // Fallback para texto se falhar gerar áudio
+          await sendEvolutionMessage(whatsapp, response);
+        }
+      } else {
+        // Resposta em texto normal
+        await sendEvolutionMessage(whatsapp, response);
+      }
     }
     
     // Se capturou interesse e nome, salvar como lead

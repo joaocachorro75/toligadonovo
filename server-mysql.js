@@ -97,6 +97,17 @@ const CREATE_TABLES = [
     id VARCHAR(50) PRIMARY KEY,
     data JSON NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS conversations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    whatsapp VARCHAR(50) NOT NULL,
+    name VARCHAR(255),
+    stage VARCHAR(50) DEFAULT 'welcome',
+    interest VARCHAR(255),
+    messages JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_whatsapp (whatsapp)
   )`
 ];
 
@@ -794,6 +805,333 @@ app.post('/api/login', async (req, res) => {
   } else {
     res.status(401).json({ success: false, error: 'Invalid credentials' });
   }
+});
+
+// ============================================
+// AGENTE DE ATENDIMENTO WHATSAPP
+// ============================================
+
+// Chaves Gemini para o agente
+const GEMINI_KEYS = [
+  'AIzaSyD_T5PyecSScMkIzXlqvr9XripMqGzkkas',
+  'AIzaSyBzTAJ32-wB19cioWVHWPouIzvYm54CwAI',
+  'AIzaSyCZrNs4ACCbFSV47H3P2q4cGzPKl0Y0Tlg',
+  'AIzaSyBtPPsvxCnQSqijn1QYlEGxJJPdHw_heYA',
+  'AIzaSyA6PMwxF4if1aqWM5a55FPONVBVztHcb_Y'
+];
+
+// Sistema do agente
+const AGENT_SYSTEM = `Você é o **Ligadinho**, atendente da To-Ligado.com!
+
+Seu jeito: Amigável, descontraído, útil e humano. Use emojis com moderação.
+
+## Seus produtos:
+- **TV Cine Box 4K** (R$ 35/mês) - +2000 canais, filmes e séries
+- **Landing Pages** (R$ 497) - Páginas que convertem
+- **Zap Marketing** (R$ 199,90/mês) - WhatsApp automatizado
+- **Lojas Virtuais** (R$ 1499) - E-commerce completo
+- **Blogs com IA** (R$ 89,90/mês) - Conteúdo automático
+- **Sistema Delivery** (R$ 99/mês) - Pedidos no WhatsApp
+- **Design Gráfico** (R$ 150) - Logos e artes
+
+## Seu fluxo:
+1. Dê boas-vindas calorosa
+2. Pergunte se conhece a To-Ligado.com
+3. Se NÃO conhecer, apresente brevemente os serviços
+4. Descubra qual serviço interessa
+5. Tire dúvidas de forma natural
+6. Quando a pessoa estiver interessada, encaminhe: "Vou te passar o link pra fecharmos: https://to-ligado.com"
+
+## Regras:
+- Seja natural, não robótico
+- Pergunte o nome da pessoa se ela não disse
+- Lembre do que ela disse antes
+- Se ela já falou o nome, use!
+- Não seja insistente, seja útil
+- Respostas curtas e diretas (máximo 3 parágrafos)
+
+Respondas sempre em português brasileiro, de forma bem humana!`;
+
+// Buscar ou criar conversa
+async function getConversation(whatsapp) {
+  if (!useMySQL || !mysqlPool) return null;
+  
+  try {
+    const [rows] = await mysqlPool.query(
+      'SELECT * FROM conversations WHERE whatsapp = ?',
+      [whatsapp]
+    );
+    
+    if (rows.length > 0) {
+      return rows[0];
+    }
+    
+    // Criar nova conversa
+    await mysqlPool.query(
+      'INSERT INTO conversations (whatsapp, messages, stage) VALUES (?, ?, ?)',
+      [whatsapp, JSON.stringify([]), 'welcome']
+    );
+    
+    const [newRows] = await mysqlPool.query(
+      'SELECT * FROM conversations WHERE whatsapp = ?',
+      [whatsapp]
+    );
+    
+    return newRows[0];
+  } catch (e) {
+    console.error('Erro ao buscar conversa:', e.message);
+    return null;
+  }
+}
+
+// Salvar mensagem na conversa
+async function saveMessage(whatsapp, role, content, name = null, interest = null, stage = null) {
+  if (!useMySQL || !mysqlPool) return;
+  
+  try {
+    // Buscar mensagens atuais
+    const [rows] = await mysqlPool.query(
+      'SELECT messages FROM conversations WHERE whatsapp = ?',
+      [whatsapp]
+    );
+    
+    const messages = rows.length > 0 ? (typeof rows[0].messages === 'string' ? JSON.parse(rows[0].messages) : rows[0].messages) : [];
+    messages.push({ role, content, timestamp: Date.now() });
+    
+    // Atualizar
+    let updateQuery = 'UPDATE conversations SET messages = ?, updated_at = NOW()';
+    const updateParams = [JSON.stringify(messages)];
+    
+    if (name) {
+      updateQuery += ', name = ?';
+      updateParams.push(name);
+    }
+    if (interest) {
+      updateQuery += ', interest = ?';
+      updateParams.push(interest);
+    }
+    if (stage) {
+      updateQuery += ', stage = ?';
+      updateParams.push(stage);
+    }
+    
+    updateQuery += ' WHERE whatsapp = ?';
+    updateParams.push(whatsapp);
+    
+    await mysqlPool.query(updateQuery, updateParams);
+  } catch (e) {
+    console.error('Erro ao salvar mensagem:', e.message);
+  }
+}
+
+// Chamar Gemini para resposta
+async function getAgentResponse(messages, whatsapp, name) {
+  const apiKey = GEMINI_KEYS[Math.floor(Math.random() * GEMINI_KEYS.length)];
+  
+  // Construir contexto
+  let contextPrompt = AGENT_SYSTEM;
+  if (name) {
+    contextPrompt += `\n\nO nome da pessoa é: ${name}`;
+  }
+  
+  // Formatar mensagens pra Gemini
+  const formattedMessages = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+  
+  // Adicionar instrução do sistema como primeira mensagem
+  formattedMessages.unshift({
+    role: 'user',
+    parts: [{ text: contextPrompt + '\n\nAgora responda a próxima mensagem do cliente:' }]
+  });
+  
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: formattedMessages,
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 500
+          }
+        })
+      }
+    );
+    
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Desculpa, tive um probleminha. Pode repetir?';
+  } catch (e) {
+    console.error('Erro no Gemini:', e.message);
+    return 'Opa, deu uma travada aqui! Pode mandar de novo?';
+  }
+}
+
+// Extrair nome da mensagem
+function extractName(text) {
+  const patterns = [
+    /meu nome é ([A-Za-zÀ-ú]+)/i,
+    /eu sou o ([A-Za-zÀ-ú]+)/i,
+    /eu sou a ([A-Za-zÀ-ú]+)/i,
+    /sou o ([A-Za-zÀ-ú]+)/i,
+    /sou a ([A-Za-zÀ-ú]+)/i,
+    /me chamo ([A-Za-zÀ-ú]+)/i,
+    /nome é ([A-Za-zÀ-ú]+)/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Extrair interesse
+function extractInterest(text) {
+  const products = [
+    { keywords: ['tv', 'cine', 'filmes', 'séries', 'streaming', 'canais'], product: 'TV Cine Box 4K' },
+    { keywords: ['landing', 'lp', 'página', 'captar', 'leads'], product: 'Landing Pages' },
+    { keywords: ['zap', 'whatsapp', 'marketing', 'bot', 'automatizar', 'envio em massa'], product: 'Zap Marketing' },
+    { keywords: ['loja', 'ecommerce', 'e-commerce', 'vender online'], product: 'Lojas Virtuais' },
+    { keywords: ['blog', 'conteúdo', 'artigos', 'seo', 'google'], product: 'Blogs com IA' },
+    { keywords: ['delivery', 'restaurante', 'lanchonete', 'pedidos', 'cardápio'], product: 'Sistema Delivery' },
+    { keywords: ['design', 'logo', 'identidade', 'marca', 'arte'], product: 'Design Gráfico' }
+  ];
+  
+  const lowerText = text.toLowerCase();
+  
+  for (const p of products) {
+    for (const keyword of p.keywords) {
+      if (lowerText.includes(keyword)) {
+        return p.product;
+      }
+    }
+  }
+  return null;
+}
+
+// Webhook da Evolution API
+app.post('/webhook/evolution', async (req, res) => {
+  try {
+    const data = req.body;
+    
+    // Verificar se é mensagem recebida
+    if (data.event !== 'messages.upsert') {
+      return res.json({ ok: true });
+    }
+    
+    const message = data.data?.message;
+    const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    const text = message?.conversation || message?.extendedTextMessage?.text || '';
+    
+    if (!whatsapp || !text) {
+      return res.json({ ok: true });
+    }
+    
+    console.log(`📩 Mensagem de ${whatsapp}: ${text}`);
+    
+    // Ignorar mensagens de grupo
+    if (whatsapp.includes('@g.us')) {
+      return res.json({ ok: true });
+    }
+    
+    // Buscar ou criar conversa
+    const conversation = await getConversation(whatsapp);
+    if (!conversation) {
+      return res.json({ ok: true });
+    }
+    
+    const messages = typeof conversation.messages === 'string' ? JSON.parse(conversation.messages) : conversation.messages;
+    let name = conversation.name;
+    let stage = conversation.stage;
+    let interest = conversation.interest;
+    
+    // Salvar mensagem do usuário
+    await saveMessage(whatsapp, 'user', text);
+    
+    // Extrair nome se mencionado
+    const extractedName = extractName(text);
+    if (extractedName && !name) {
+      name = extractedName;
+    }
+    
+    // Extrair interesse se mencionado
+    const extractedInterest = extractInterest(text);
+    if (extractedInterest) {
+      interest = extractedInterest;
+    }
+    
+    // Adicionar mensagem atual
+    messages.push({ role: 'user', content: text });
+    
+    // Gerar resposta
+    const response = await getAgentResponse(messages, whatsapp, name);
+    
+    // Salvar resposta
+    await saveMessage(whatsapp, 'assistant', response, name, interest, stage);
+    
+    // Enviar resposta
+    const config = await loadConfig();
+    if (config.evolution?.enabled) {
+      await sendEvolutionMessage(whatsapp, response);
+    }
+    
+    // Se capturou interesse e nome, salvar como lead
+    if (name && interest) {
+      await saveLead({
+        id: whatsapp,
+        name: name,
+        phone: whatsapp,
+        interest: interest,
+        source: 'whatsapp_agent',
+        createdAt: new Date().toISOString()
+      });
+      
+      // Atualizar stage
+      await saveMessage(whatsapp, 'system', 'Lead capturado', null, null, 'captured');
+      
+      // Notificar admin
+      if (config.evolution?.enabled && config.whatsapp) {
+        const leadMsg = `🆕 *Novo Lead Captado!*\n\n👤 Nome: ${name}\n📱 WhatsApp: ${whatsapp}\n💼 Interesse: ${interest}`;
+        await sendEvolutionMessage(config.whatsapp, leadMsg);
+      }
+    }
+    
+    res.json({ ok: true, response });
+  } catch (e) {
+    console.error('Erro no webhook:', e.message);
+    res.json({ ok: true });
+  }
+});
+
+// Rota para ver conversas (admin)
+app.get('/api/conversations', async (req, res) => {
+  if (!useMySQL || !mysqlPool) {
+    return res.json([]);
+  }
+  
+  try {
+    const [rows] = await mysqlPool.query(
+      'SELECT id, whatsapp, name, stage, interest, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT 100'
+    );
+    res.json(rows);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+// Rota para ver uma conversa
+app.get('/api/conversations/:whatsapp', async (req, res) => {
+  const conversation = await getConversation(req.params.whatsapp);
+  if (!conversation) {
+    return res.status(404).json({ error: 'Conversa não encontrada' });
+  }
+  
+  const messages = typeof conversation.messages === 'string' ? JSON.parse(conversation.messages) : conversation.messages;
+  res.json({ ...conversation, messages });
 });
 
 // SPA Fallback

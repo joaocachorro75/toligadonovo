@@ -743,7 +743,16 @@ app.delete('/api/leads/:id', async (req, res) => {
 app.get('/api/orders', async (req, res) => res.json(await loadOrders()));
 
 app.post('/api/orders', async (req, res) => {
-  await saveOrder(req.body);
+  const order = req.body;
+  await saveOrder(order);
+  
+  // Notificar no WhatsApp quando nova venda
+  const config = await loadConfig();
+  if (config.evolution?.enabled && config.whatsapp) {
+    const msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}\n\n📧 Email: ${order.customerEmail || 'Não informado'}`;
+    await sendEvolutionMessage(config.whatsapp, msg);
+  }
+  
   res.json({ success: true });
 });
 

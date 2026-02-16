@@ -966,10 +966,18 @@ async function getAgentResponse(messages, whatsapp, name) {
     );
     
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Desculpa, tive um probleminha. Pode repetir?';
+    
+    // Verificar se houve erro na API
+    if (data.error) {
+      console.error('Erro na API Gemini:', JSON.stringify(data.error));
+      return null; // Retorna null para indicar erro
+    }
+    
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return responseText || null; // Retorna null se não tiver resposta
   } catch (e) {
     console.error('Erro no Gemini:', e.message);
-    return 'Opa, deu uma travada aqui! Pode mandar de novo?';
+    return null; // Retorna null para indicar erro
   }
 }
 
@@ -1094,6 +1102,12 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // Gerar resposta
     const response = await getAgentResponse(messages, whatsapp, name);
+    
+    // Se resposta for null (erro), não responder para evitar loop
+    if (!response) {
+      console.error('Gemini falhou, não respondendo para evitar loop');
+      return res.json({ ok: true, error: 'gemini_failed' });
+    }
     
     // Salvar resposta
     await saveMessage(whatsapp, 'assistant', response, name, interest, stage);

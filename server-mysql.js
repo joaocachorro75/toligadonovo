@@ -1237,13 +1237,8 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
-    // Ligadinha (atendente) SÓ responde para clientes externos
-    // Admin (559180124904) conversa com Ligadinho (OpenClaw), não com Ligadinha
-    const ADMIN_NUMBER = '559180124904';
-    if (whatsapp === ADMIN_NUMBER) {
-      console.log('Admin conversa com Ligadinho, não com Ligadinha');
-      return res.json({ ok: true });
-    }
+    // Ligadinho atende TODOS (admin e clientes)
+    // Removido bloqueio do admin - agora responde a todos
     
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;

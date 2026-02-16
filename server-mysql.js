@@ -1196,8 +1196,18 @@ app.post('/webhook/evolution', async (req, res) => {
       wasAudio = true; // Era áudio
       const config = await loadConfig();
       
-      // Tentar transcrever o áudio
-      const audioUrl = message?.audioMessage?.url || message?.streaming?.url;
+      // Debug: mostrar estrutura da mensagem de áudio
+      console.log('🔍 Estrutura do áudio:', JSON.stringify(message?.audioMessage || message?.streaming || {}, null, 2));
+      console.log('🔍 Tipo de mensagem:', messageType);
+      console.log('🔍 Message completo:', JSON.stringify(message, null, 2).substring(0, 500));
+      
+      // Tentar transcrever o áudio - Evolution API pode enviar de várias formas
+      const audioUrl = message?.audioMessage?.url 
+        || message?.streaming?.url 
+        || message?.audioMessage?.directPath
+        || message?.audioMessage?.mediaKey?.url;
+      
+      console.log('🔗 URL do áudio extraída:', audioUrl);
       
       if (audioUrl && config.evolution?.enabled) {
         // Avisar que está processando

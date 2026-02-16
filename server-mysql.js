@@ -10,6 +10,9 @@ const cors = require('cors');
 // Robust Fetch Import
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args)).catch(() => global.fetch(...args));
 
+// FormData (Node.js 18+ já tem global, mas garante)
+const FormData = global.FormData || require('form-data');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -1025,9 +1028,31 @@ app.post('/webhook/evolution', async (req, res) => {
     
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
-    const text = message?.conversation || message?.extendedTextMessage?.text || '';
+    const fromMe = data.data?.key?.fromMe; // Se é mensagem enviada por mim
+    const messageType = message?.messageType || '';
+    let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    if (!whatsapp || !text) {
+    // Ignorar mensagens enviadas por mim mesmo
+    if (!whatsapp || fromMe) {
+      return res.json({ ok: true });
+    }
+    
+    // Ignorar mensagens de grupo
+    if (whatsapp.includes('@g.us')) {
+      return res.json({ ok: true });
+    }
+    
+    // Verificar se é áudio
+    if (message?.audioMessage || messageType === 'audioMessage' || messageType === 'ptt') {
+      // Por enquanto, pedir texto
+      const config = await loadConfig();
+      if (config.evolution?.enabled) {
+        await sendEvolutionMessage(whatsapp, 'Ops! Ainda não consigo ouvir áudios 😅 Pode mandar por texto?');
+      }
+      return res.json({ ok: true });
+    }
+    
+    if (!text) {
       return res.json({ ok: true });
     }
     

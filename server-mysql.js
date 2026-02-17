@@ -1225,9 +1225,19 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
-    // NOTA: fromMe desbloqueado - admin usa mesmo número do atendente
-    // O loop será evitado pelo controle de mensagens duplicadas (msgId)
-    // Se houver loop, a solução é usar dois números separados
+    const message = data.data?.message;
+    const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    const messageType = message?.messageType || '';
+    let text = message?.conversation || message?.extendedTextMessage?.text || '';
+    
+    // OPÇÃO 3: Palavra-chave "Ligadinho" - atendente ignora e deixa OpenClaw responder
+    // Se a mensagem começar com "Ligadinho" (case insensitive), o atendente ignora
+    // Isso permite o admin falar com o OpenClaw usando o mesmo número
+    const lowerText = text.toLowerCase().trim();
+    if (lowerText.startsWith('ligadinho ') || lowerText === 'ligadinho') {
+      console.log('Mensagem com palavra-chave "Ligadinho" ignorada - OpenClaw vai responder');
+      return res.json({ ok: true, ignored: 'ligadinho_keyword' });
+    }
     
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
@@ -1255,10 +1265,13 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
-    // Ligadinho atende TODOS (admin e clientes)
-    // fromMe removido - admin usa mesmo número do atendente
-    // NOTA: Isso pode causar loop se o atendente responder às próprias mensagens
-    // Mas é necessário para o admin poder usar o OpenClaw ao mesmo tempo
+    // CRÍTICO: Bloquear fromMe para evitar loop
+    // O admin pode falar com o OpenClaw usando a palavra-chave "Ligadinho"
+    const fromMe = data.data?.key?.fromMe;
+    if (fromMe === true) {
+      console.log('Mensagem fromMe ignorada (evitar loop)');
+      return res.json({ ok: true });
+    }
     
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;

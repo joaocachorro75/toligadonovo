@@ -1239,6 +1239,13 @@ app.post('/webhook/evolution', async (req, res) => {
     // Ligadinho atende TODOS (admin e clientes)
     // fromMe removido - admin usa mesmo número do atendente
     
+    // CRÍTICO: Ignorar mensagens fromMe para evitar loop infinito
+    // O atendente NÃO deve responder às próprias mensagens que ele envia
+    if (fromMe === true) {
+      console.log('Mensagem fromMe ignorada (evitar loop)');
+      return res.json({ ok: true });
+    }
+    
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;
     
@@ -1419,8 +1426,8 @@ app.post('/webhook/evolution', async (req, res) => {
       }
     }
     
-    // Se capturou interesse e nome, salvar como lead
-    if (name && interest) {
+    // Se capturou interesse e nome, salvar como lead (só se ainda não foi capturado)
+    if (name && interest && conversation.stage !== 'captured') {
       await saveLead({
         id: whatsapp,
         name: name,

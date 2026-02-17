@@ -1244,6 +1244,13 @@ app.post('/webhook/evolution', async (req, res) => {
     console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));
     console.log('📦 Message keys:', Object.keys(message || {}));
     
+    // Se tiver audioMessage, mostrar estrutura
+    if (message?.audioMessage) {
+      console.log('🔊 audioMessage keys:', Object.keys(message.audioMessage));
+      console.log('🔊 audioMessage.base64 existe?', !!message.audioMessage?.base64);
+      console.log('🔊 audioMessage.base64 length:', message.audioMessage?.base64?.length || 0);
+    }
+    
     // Ignorar mensagens sem WhatsApp
     if (!whatsapp) {
       return res.json({ ok: true });

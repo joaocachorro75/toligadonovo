@@ -1251,24 +1251,51 @@ app.post('/webhook/evolution', async (req, res) => {
       const config = await loadConfig();
       console.log(`Áudio recebido de ${whatsapp}, processando...`);
       
-      // Baixar áudio da URL direta
-      const audioUrl = message?.audioMessage?.url;
       let transcribedText = null;
       
-      if (audioUrl) {
-        try {
-          // Baixar áudio diretamente
-          const audioResponse = await fetch(audioUrl);
-          if (audioResponse.ok) {
-            const audioBuffer = await audioResponse.buffer();
-            console.log(`Áudio baixado: ${audioBuffer.length} bytes`);
+      try {
+        // Usar Evolution API para obter áudio descriptografado
+        const msgKey = data.data?.key;
+        
+        // Endpoint para obter mídia em base64
+        const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/getBase64Media/${config.evolution.instanceName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.evolution.apiKey
+          },
+          body: JSON.stringify({
+            message: msgKey
+          })
+        });
+        
+        if (mediaResponse.ok) {
+          const mediaData = await mediaResponse.json();
+          const base64Audio = mediaData.base64 || mediaData.media;
+          
+          if (base64Audio) {
+            const audioBuffer = Buffer.from(base64Audio, 'base64');
+            console.log(`Áudio descriptografado: ${audioBuffer.length} bytes`);
             
             // Transcrever com ElevenLabs
             transcribedText = await transcribeAudioBuffer(audioBuffer);
           }
-        } catch (e) {
-          console.error('Erro ao processar áudio:', e.message);
+        } else {
+          // Fallback: tentar URL direta (pode funcionar em alguns casos)
+          const audioUrl = message?.audioMessage?.url;
+          if (audioUrl) {
+            console.log('Tentando URL direta...');
+            const audioResponse = await fetch(audioUrl);
+            if (audioResponse.ok) {
+              const audioBuffer = await audioResponse.buffer();
+              if (audioBuffer.length > 1000) { // Arquivo válido tem mais de 1KB
+                transcribedText = await transcribeAudioBuffer(audioBuffer);
+              }
+            }
+          }
         }
+      } catch (e) {
+        console.error('Erro ao processar áudio:', e.message);
       }
       
       if (!transcribedText) {
@@ -1346,25 +1373,30 @@ app.post('/webhook/evolution', async (req, res) => {
         const audioBuffer = await textToSpeech(response);
         
         if (audioBuffer) {
-          // Enviar áudio via Evolution API
+          // Enviar áudio via Evolution API (endpoint correto: /message/sendMedia)
           try {
-            const formData = new FormData();
-            formData.append('number', whatsapp);
-            formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'response.mp3');
-            formData.append('mimetype', 'audio/mpeg');
+            // Converter buffer para base64
+            const base64Audio = audioBuffer.toString('base64');
+            const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
             
-            const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/sendVoice/${config.evolution.instanceName}`, {
+            const mediaResponse = await fetch(`${config.evolution.baseUrl}/message/sendMedia/${config.evolution.instanceName}`, {
               method: 'POST',
               headers: {
+                'Content-Type': 'application/json',
                 'apikey': config.evolution.apiKey
               },
-              body: formData
+              body: JSON.stringify({
+                number: whatsapp,
+                mediatype: 'audio',
+                media: dataUrl
+              })
             });
             
             if (mediaResponse.ok) {
               console.log('✅ Áudio enviado com sucesso!');
             } else {
-              console.error('Erro ao enviar áudio, enviando texto...');
+              const errData = await mediaResponse.json();
+              console.error('Erro ao enviar áudio:', JSON.stringify(errData));
               await sendEvolutionMessage(whatsapp, response);
             }
           } catch (e) {

@@ -955,7 +955,7 @@ async function textToSpeech(text) {
       body: JSON.stringify({
         text: text,
         model_id: 'eleven_multilingual_v2',
-        language_code: 'pt-BR', // Forçar português do Brasil
+        // O modelo multilingual detecta português automaticamente pelo texto
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75

@@ -1236,7 +1236,6 @@ app.post('/webhook/evolution', async (req, res) => {
     
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
-    const fromMe = data.data?.key?.fromMe; // Se é mensagem enviada por mim
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     

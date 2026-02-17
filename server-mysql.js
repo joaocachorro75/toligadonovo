@@ -1227,17 +1227,22 @@ app.post('/webhook/evolution', async (req, res) => {
     
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
+    const fromMe = data.data?.key?.fromMe;
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // OPÇÃO 3: Palavra-chave "Ligadinho" - atendente ignora e deixa OpenClaw responder
-    // Se a mensagem começar com "Ligadinho" (case insensitive), o atendente ignora
-    // Isso permite o admin falar com o OpenClaw usando o mesmo número
+    // OPÇÃO 3: Palavra-chave "Ligadinho" - SÓ para o admin (fromMe = true)
+    // Se a mensagem começar com "Ligadinho" E for do admin, o atendente ignora
+    // Clientes que falarem "Ligadinho" serão atendidos normalmente
     const lowerText = text.toLowerCase().trim();
-    if (lowerText.startsWith('ligadinho ') || lowerText === 'ligadinho') {
-      console.log('Mensagem com palavra-chave "Ligadinho" ignorada - OpenClaw vai responder');
-      return res.json({ ok: true, ignored: 'ligadinho_keyword' });
+    if ((lowerText.startsWith('ligadinho ') || lowerText === 'ligadinho') && fromMe === true) {
+      console.log('Mensagem "Ligadinho" do admin ignorada - OpenClaw vai responder');
+      return res.json({ ok: true, ignored: 'ligadinho_admin' });
     }
+    
+    // LOG: Verificar tipo de mensagem e estrutura completa
+    console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));
+    console.log('📦 Message keys:', Object.keys(message || {}));
     
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');

@@ -977,19 +977,26 @@ async function textToSpeech(text) {
   }
 }
 
-// Sistema do agente
-const AGENT_SYSTEM = `Você é o **Ligadinho**, atendente da To-Ligado.com!
+// Gerar lista de produtos dinamicamente
+async function getProductsListForPrompt() {
+  const products = await loadProducts();
+  return products.map(p => {
+    const price = p.paymentType === 'recurring' 
+      ? `R$ ${p.price.toFixed(2).replace('.', ',')}/${p.billingCycle === 'monthly' ? 'mês' : 'ano'}`
+      : `R$ ${p.price.toFixed(2).replace('.', ',')}`;
+    return `- **${p.title}** (${price}) - ${p.shortDescription}`;
+  }).join('\n');
+}
+
+// Gerar prompt do agente com preços dinâmicos
+async function getAgentSystemPrompt() {
+  const productsList = await getProductsListForPrompt();
+  return `Você é o **Ligadinho**, atendente da To-Ligado.com!
 
 Seu jeito: Amigável, descontraída, útil e humana. Use emojis com moderação.
 
 ## Seus produtos:
-- **TV Cine Box 4K** (R$ 35/mês) - +2000 canais, filmes e séries
-- **Landing Pages** (R$ 497) - Páginas que convertem
-- **Zap Marketing** (R$ 199,90/mês) - WhatsApp automatizado
-- **Lojas Virtuais** (R$ 1499) - E-commerce completo
-- **Blogs com IA** (R$ 89,90/mês) - Conteúdo automático
-- **Sistema Delivery** (R$ 99/mês) - Pedidos no WhatsApp
-- **Design Gráfico** (R$ 150) - Logos e artes
+${productsList}
 
 ## Seu fluxo:
 1. Dê boas-vindas calorosa
@@ -1008,6 +1015,7 @@ Seu jeito: Amigável, descontraída, útil e humana. Use emojis com moderação.
 - Respostas curtas e diretas (máximo 3 parágrafos)
 
 Respondas sempre em português brasileiro, de forma bem humana!`;
+}
 
 // Buscar ou criar conversa
 async function getConversation(whatsapp) {
@@ -1083,8 +1091,8 @@ async function saveMessage(whatsapp, role, content, name = null, interest = null
 
 // Função principal - usa Modal GLM-5 com rotação de chaves
 async function getAgentResponse(messages, whatsapp, name) {
-  // Construir contexto
-  let contextPrompt = AGENT_SYSTEM;
+  // Construir contexto com preços dinâmicos do banco
+  let contextPrompt = await getAgentSystemPrompt();
   if (name) {
     contextPrompt += `\n\nO nome da pessoa é: ${name}`;
   }
@@ -1214,6 +1222,15 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // Verificar se é mensagem recebida
     if (data.event !== 'messages.upsert') {
+      return res.json({ ok: true });
+    }
+    
+    // CRÍTICO: Ignorar mensagens fromMe para evitar loop
+    // Isso inclui mensagens enviadas pelo admin no celular E pelo atendente via API
+    // Solução: O admin deve usar o OpenClaw com o atendente DESLIGADO
+    const fromMe = data.data?.key?.fromMe;
+    if (fromMe === true) {
+      console.log('Mensagem fromMe ignorada (evitar loop)');
       return res.json({ ok: true });
     }
     

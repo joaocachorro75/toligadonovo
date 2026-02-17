@@ -898,24 +898,24 @@ async function transcribeAudio(audioUrl) {
   }
 }
 
-// Transcrever áudio de um buffer usando ElevenLabs (mais preciso)
+// Transcrever áudio de um buffer usando Groq Whisper (ilimitado e gratuito)
 async function transcribeAudioBuffer(audioBuffer) {
   try {
-    if (!ELEVENLABS_API_KEY) {
-      console.error('ElevenLabs API key não configurada');
+    if (!GROQ_API_KEY) {
+      console.error('Groq API key não configurada');
       return null;
     }
 
-    console.log('Transcrevendo áudio com ElevenLabs...');
+    console.log('Transcrevendo áudio com Groq Whisper...');
     
     const formData = new FormData();
     formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
-    formData.append('model_id', 'scribe_v1');
+    formData.append('model', 'whisper-large-v3');
     
-    const sttResponse = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+    const sttResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY
+        'Authorization': `Bearer ${GROQ_API_KEY}`
       },
       body: formData
     });
@@ -923,8 +923,7 @@ async function transcribeAudioBuffer(audioBuffer) {
     const data = await sttResponse.json();
     
     if (data.text) {
-      console.log('Áudio transcrito (ElevenLabs):', data.text);
-      console.log('Idioma detectado:', data.language_code, `(${(data.language_probability * 100).toFixed(1)}%)`);
+      console.log('Áudio transcrito (Groq):', data.text);
       return data.text;
     }
     

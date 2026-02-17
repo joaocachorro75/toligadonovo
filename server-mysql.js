@@ -955,6 +955,7 @@ async function textToSpeech(text) {
       body: JSON.stringify({
         text: text,
         model_id: 'eleven_multilingual_v2',
+        language_code: 'pt-BR', // Forçar português do Brasil
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75
@@ -1236,8 +1237,14 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
+    // CRÍTICO: Ignorar mensagens fromMe para evitar loop infinito
+    // O atendente NÃO deve responder às próprias mensagens que ele envia
+    if (fromMe === true) {
+      console.log('Mensagem fromMe ignorada (evitar loop)');
+      return res.json({ ok: true });
+    }
+    
     // Ligadinho atende TODOS (admin e clientes)
-    // fromMe removido - admin usa mesmo número do atendente
     
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;

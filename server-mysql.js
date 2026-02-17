@@ -1231,23 +1231,13 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // OPÇÃO 3: Palavra-chave "Ligadinho" - SÓ para o admin (fromMe = true)
-    // Se a mensagem começar com "Ligadinho" E for do admin, o atendente ignora
-    // Clientes que falarem "Ligadinho" serão atendidos normalmente
-    const lowerText = text.toLowerCase().trim();
-    if ((lowerText.startsWith('ligadinho ') || lowerText === 'ligadinho') && fromMe === true) {
-      console.log('Mensagem "Ligadinho" do admin ignorada - OpenClaw vai responder');
-      return res.json({ ok: true, ignored: 'ligadinho_admin' });
+    // CRÍTICO: Ignorar mensagens fromMe (admin) para evitar loop
+    // O admin usa o OpenClaw - clientes usam o atendente
+    // TODAS as mensagens do admin são ignoradas pelo atendente
+    if (fromMe === true) {
+      console.log('Mensagem do admin (fromMe) ignorada - OpenClaw vai responder');
+      return res.json({ ok: true, ignored: 'admin_message' });
     }
-    
-    // LOG: Verificar tipo de mensagem e estrutura completa
-    console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));
-    console.log('📦 Message keys:', Object.keys(message || {}));
-    
-    const message = data.data?.message;
-    const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
-    const messageType = message?.messageType || '';
-    let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
     // LOG: Verificar tipo de mensagem e estrutura completa
     console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));
@@ -1267,14 +1257,6 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // Ignorar mensagens de grupo
     if (whatsapp.includes('@g.us')) {
-      return res.json({ ok: true });
-    }
-    
-    // CRÍTICO: Bloquear fromMe para evitar loop
-    // O admin pode falar com o OpenClaw usando a palavra-chave "Ligadinho"
-    const fromMe = data.data?.key?.fromMe;
-    if (fromMe === true) {
-      console.log('Mensagem fromMe ignorada (evitar loop)');
       return res.json({ ok: true });
     }
     

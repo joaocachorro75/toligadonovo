@@ -1209,6 +1209,9 @@ app.post('/webhook/evolution', async (req, res) => {
   try {
     const data = req.body;
     
+    // LOG: Verificar se webhook está recebendo
+    console.log('🔔 Webhook recebido:', data.event, '- from:', data.data?.key?.remoteJid);
+    
     // Verificar se é mensagem recebida
     if (data.event !== 'messages.upsert') {
       return res.json({ ok: true });
@@ -1219,6 +1222,9 @@ app.post('/webhook/evolution', async (req, res) => {
     const fromMe = data.data?.key?.fromMe; // Se é mensagem enviada por mim
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
+    
+    // LOG: Verificar tipo de mensagem
+    console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));
     
     // Ignorar mensagens sem WhatsApp
     if (!whatsapp) {

@@ -855,7 +855,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 // ElevenLabs para TTS (Text to Speech)
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel (free)
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'IKne3meq5aSn9XLyUdCD'; // Charlie (masculino, pt-BR)
 
 async function transcribeAudio(audioUrl) {
   try {

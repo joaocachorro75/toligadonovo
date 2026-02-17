@@ -1238,13 +1238,8 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // Ligadinho atende TODOS (admin e clientes)
     // fromMe removido - admin usa mesmo número do atendente
-    
-    // CRÍTICO: Ignorar mensagens fromMe para evitar loop infinito
-    // O atendente NÃO deve responder às próprias mensagens que ele envia
-    if (fromMe === true) {
-      console.log('Mensagem fromMe ignorada (evitar loop)');
-      return res.json({ ok: true });
-    }
+    // NOTA: Isso pode causar loop se o atendente responder às próprias mensagens
+    // Mas é necessário para o admin poder usar o OpenClaw ao mesmo tempo
     
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;

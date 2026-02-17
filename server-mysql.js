@@ -1240,8 +1240,9 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // LOG: Verificar tipo de mensagem
+    // LOG: Verificar tipo de mensagem e estrutura completa
     console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));
+    console.log('📦 Message keys:', Object.keys(message || {}));
     
     // Ignorar mensagens sem WhatsApp
     if (!whatsapp) {

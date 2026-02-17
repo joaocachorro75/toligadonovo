@@ -1237,23 +1237,8 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
-    // CRÍTICO: Ignorar mensagens fromMe para evitar loop infinito
-    // O atendente NÃO deve responder às próprias mensagens que ele envia
-    if (fromMe === true) {
-      console.log('Mensagem fromMe ignorada (evitar loop)');
-      return res.json({ ok: true });
-    }
-    
-    // CRÍTICO: Ignorar mensagens do ADMIN (João)
-    // O admin usa o OpenClaw diretamente - o atendente é só para clientes
-    // O número do admin é o mesmo da instância: 559180124904
-    const ADMIN_WHATSAPP = '559180124904';
-    if (whatsapp === ADMIN_WHATSAPP) {
-      console.log('Mensagem do admin ignorada - admin usa OpenClaw diretamente');
-      return res.json({ ok: true, reason: 'admin_uses_openclaw' });
-    }
-    
-    // Ligadinho atende TODOS (exceto admin, que usa OpenClaw)
+    // Ligadinho atende TODOS (admin e clientes)
+    // fromMe removido - admin usa mesmo número do atendente
     
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;

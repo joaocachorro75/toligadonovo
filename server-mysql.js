@@ -855,7 +855,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 // ElevenLabs para TTS (Text to Speech)
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel (feminino, multilingual)
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel (feminino, inglês - funciona no WhatsApp)
 
 async function transcribeAudio(audioUrl) {
   try {
@@ -953,8 +953,8 @@ async function textToSpeech(text) {
       },
       body: JSON.stringify({
         text: text,
-        model_id: 'eleven_multilingual_v2',
-        // O modelo multilingual detecta português automaticamente pelo texto
+        // Sem model_id = usa padrão da API (funciona em inglês)
+        // NOTA: eleven_multilingual_v2 causa erro no áudio no WhatsApp
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75

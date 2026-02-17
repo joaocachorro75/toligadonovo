@@ -1225,14 +1225,9 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
-    // CRÍTICO: Ignorar mensagens fromMe para evitar loop
-    // Isso inclui mensagens enviadas pelo admin no celular E pelo atendente via API
-    // Solução: O admin deve usar o OpenClaw com o atendente DESLIGADO
-    const fromMe = data.data?.key?.fromMe;
-    if (fromMe === true) {
-      console.log('Mensagem fromMe ignorada (evitar loop)');
-      return res.json({ ok: true });
-    }
+    // NOTA: fromMe desbloqueado - admin usa mesmo número do atendente
+    // O loop será evitado pelo controle de mensagens duplicadas (msgId)
+    // Se houver loop, a solução é usar dois números separados
     
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');

@@ -1230,15 +1230,8 @@ app.post('/webhook/evolution', async (req, res) => {
       return res.json({ ok: true });
     }
     
-    // CRÍTICO: Ignorar mensagens que o próprio bot enviou (fromMe: true)
-    // Isso evita loop infinito onde o bot responde às próprias mensagens
-    if (fromMe) {
-      console.log('Ignorando mensagem do próprio bot (fromMe)');
-      return res.json({ ok: true });
-    }
-    
     // Ligadinho atende TODOS (admin e clientes)
-    // Removido bloqueio do admin - agora responde a todos
+    // fromMe removido - admin usa mesmo número do atendente
     
     // Controle de mensagens duplicadas (evitar responder 2x a mesma msg)
     const msgId = data.data?.key?.id;

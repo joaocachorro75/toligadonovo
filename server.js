@@ -1298,6 +1298,7 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // LOG: Verificar se webhook está recebendo
     console.log('🔔 Webhook recebido:', data.event, '- from:', data.data?.key?.remoteJid);
+    console.log('📦 PAYLOAD COMPLETO:', JSON.stringify(data.data?.key, null, 2));
     
     // Verificar se é mensagem recebida
     if (data.event !== 'messages.upsert') {
@@ -1307,14 +1308,22 @@ app.post('/webhook/evolution', async (req, res) => {
     const message = data.data?.message;
     const whatsapp = data.data?.key?.remoteJid?.replace('@s.whatsapp.net', '');
     const fromMe = data.data?.key?.fromMe;
+    const pushName = data.data?.pushName || '';
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // CRÍTICO: Ignorar mensagens fromMe (enviadas por João)
-    // fromMe=true = João enviou (não deve ser respondido)
-    // fromMe=false = Cliente enviou (Ligadinho responde)
-    if (fromMe === true) {
-      console.log('⏭️ Mensagem fromMe (enviada por João) - ignorando');
+    // WORKAROUND: Evolution API bug - às vezes envia fromMe=true para mensagens recebidas
+    // Solução: verificar pushName
+    // - pushName "Você" = mensagem enviada por João (ignorar)
+    // - pushName com nome/numero = mensagem recebida do cliente (processar)
+    const isSentByMe = fromMe === true && pushName === 'Você';
+    const isReceived = fromMe === false || (fromMe === true && pushName !== 'Você');
+    
+    console.log(`🔍 fromMe=${fromMe}, pushName="${pushName}", isSentByMe=${isSentByMe}, isReceived=${isReceived}`);
+    
+    // Ignorar mensagens que João enviou
+    if (isSentByMe) {
+      console.log('⏭️ Mensagem enviada por João - ignorando');
       return res.json({ ok: true, ignored: true });
     }
     

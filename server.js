@@ -1231,12 +1231,35 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // CRÍTICO: Ignorar mensagens fromMe (admin) para evitar loop
-    // O admin usa o OpenClaw - clientes usam o atendente
-    // TODAS as mensagens do admin são ignoradas pelo atendente
+    // CRÍTICO: Transferir mensagens fromMe (admin) para OpenClaw
+    // O admin usa o OpenClaw (Robotic) - clientes usam o Ligadinho
+    // Mensagens do admin são transferidas para o OpenClaw responder
     if (fromMe === true) {
-      console.log('Mensagem do admin (fromMe) ignorada - OpenClaw vai responder');
-      return res.json({ ok: true, ignored: 'admin_message' });
+      console.log('Mensagem do admin (fromMe) detectada - transferindo para OpenClaw');
+      
+      // Transferir para OpenClaw via webhook
+      try {
+        const openclawUrl = process.env.OPENCLAW_URL || 'http://host.docker.internal:18789';
+        const openclawToken = '1542658497515794168875165986594';
+        
+        await fetch(`${openclawUrl}/hooks/wake`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openclawToken}`
+          },
+          body: JSON.stringify({
+            text: `[WhatsApp/João] ${text}`,
+            mode: 'now'
+          })
+        });
+        
+        console.log('✅ Mensagem transferida para OpenClaw com sucesso!');
+      } catch (e) {
+        console.error('Erro ao transferir para OpenClaw:', e.message);
+      }
+      
+      return res.json({ ok: true, transferred: 'openclaw' });
     }
     
     // LOG: Verificar tipo de mensagem e estrutura completa

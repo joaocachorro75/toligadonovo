@@ -835,8 +835,9 @@ app.post('/api/login', async (req, res) => {
 
 // Modal GLM-5 - múltiplas chaves com rotação
 // Configure MODAL_API_KEYS no Easypanel com chaves separadas por vírgula
-// Exemplo: chave1,chave2,chave3
-const MODAL_KEYS = (process.env.MODAL_API_KEYS || 'modalresearch_LL0OqTH_cr20RZT48ekS2NarzbVvtbV44w6_x1Y8tY0')
+// OBRIGATÓRIO: configurar no EasyPanel → Environment Variables
+// Exemplo: MODAL_API_KEYS=chave1,chave2,chave3
+const MODAL_KEYS = (process.env.MODAL_API_KEYS || '')
   .split(',')
   .map(k => k.trim())
   .filter(k => k.length > 0);

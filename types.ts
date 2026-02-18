@@ -93,3 +93,20 @@ export interface SiteConfig {
 export interface AdminState {
   isAuthenticated: boolean;
 }
+
+export interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company?: string;
+  instance_name: string;
+  instance_qrcode?: string;
+  instance_status?: 'pending' | 'connected' | 'disconnected';
+  plan?: string;
+  monthly_price?: number;
+  agent_prompt?: string;
+  agent_active?: boolean;
+  created_at: string;
+  updated_at?: string;
+}

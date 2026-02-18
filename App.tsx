@@ -6,6 +6,7 @@ import { Blog } from './pages/Blog';
 import { BlogPostPage } from './pages/BlogPostPage';
 import { AdminLogin } from './pages/Admin/Login';
 import { AdminDashboard } from './pages/Admin/Dashboard';
+import { AdminClients } from './pages/Admin/Clients';
 import { db } from './services/db';
 
 const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
@@ -33,6 +34,12 @@ function App() {
             <ProtectedRoute>
                 <Navigate to="/admin/leads" replace />
             </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/clients" element={
+          <ProtectedRoute>
+            <AdminClients />
+          </ProtectedRoute>
         } />
         
         <Route path="/admin/leads" element={

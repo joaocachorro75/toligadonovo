@@ -1312,20 +1312,15 @@ app.post('/webhook/evolution', async (req, res) => {
     const messageType = message?.messageType || '';
     let text = message?.conversation || message?.extendedTextMessage?.text || '';
     
-    // WORKAROUND: Evolution API bug - às vezes envia fromMe=true para mensagens recebidas
-    // Solução: verificar pushName
-    // - pushName "Você" = mensagem enviada por João (ignorar)
-    // - pushName com nome/numero = mensagem recebida do cliente (processar)
-    const isSentByMe = fromMe === true && pushName === 'Você';
-    const isReceived = fromMe === false || (fromMe === true && pushName !== 'Você');
-    
-    console.log(`🔍 fromMe=${fromMe}, pushName="${pushName}", isSentByMe=${isSentByMe}, isReceived=${isReceived}`);
-    
-    // Ignorar mensagens que João enviou
-    if (isSentByMe) {
-      console.log('⏭️ Mensagem enviada por João - ignorando');
+    // REGRA SIMPLES: fromMe=true = João ENVIOU (ignorar)
+    // fromMe=false = Cliente enviou (Ligadinho responde)
+    // O pushName pode variar ("Você" ou "To-ligado.com") mas fromMe é confiável
+    if (fromMe === true) {
+      console.log('⏭️ Mensagem enviada por João (fromMe=true) - ignorando');
       return res.json({ ok: true, ignored: true });
     }
+    
+    console.log(`🔍 fromMe=${fromMe}, pushName="${pushName}" - MENSAGEM RECEBIDA DO CLIENTE`);
     
     // LOG: Verificar tipo de mensagem e estrutura completa
     console.log('📱 Tipo:', messageType, '| Áudio:', !!message?.audioMessage, '| Texto:', text?.substring(0, 30));

@@ -1313,44 +1313,7 @@ app.post('/webhook/evolution', async (req, res) => {
     // CRÍTICO: Ignorar mensagens fromMe (enviadas por João)
     // fromMe=true = João enviou (não deve ser respondido)
     // fromMe=false = Cliente enviou (Ligadinho responde)
-    // EXCEÇÃO: Se for admin enviando, transfere para OpenClaw
-    const ADMIN_WHATSAPP = '559180124904';
-    
-    // DEBUG: Log detalhado
-    console.log(`🔍 DEBUG: fromMe=${fromMe}, whatsapp=${whatsapp}, isAdmin=${whatsapp === ADMIN_WHATSAPP}`);
-    
-    // Se é mensagem que João enviou (fromMe=true)
     if (fromMe === true) {
-      // Se é o admin, transferir para OpenClaw
-      if (whatsapp === ADMIN_WHATSAPP) {
-        console.log('✅ Mensagem do admin (fromMe) detectada - transferindo para OpenClaw');
-        
-        // Transferir para OpenClaw via webhook
-        try {
-          const openclawUrl = process.env.OPENCLAW_URL || 'http://host.docker.internal:18789';
-          const openclawToken = '1542658497515794168875165986594';
-          
-          await fetch(`${openclawUrl}/hooks/wake`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openclawToken}`
-            },
-            body: JSON.stringify({
-              text: `[WhatsApp/João] ${text}`,
-              mode: 'now'
-            })
-          });
-          
-          console.log('✅ Mensagem transferida para OpenClaw com sucesso!');
-        } catch (e) {
-          console.error('Erro ao transferir para OpenClaw:', e.message);
-        }
-        
-        return res.json({ ok: true, transferred: 'openclaw' });
-      }
-      
-      // Se não é admin, IGNORAR completamente (são mensagens que João enviou pra clientes)
       console.log('⏭️ Mensagem fromMe (enviada por João) - ignorando');
       return res.json({ ok: true, ignored: true });
     }

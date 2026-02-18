@@ -1206,40 +1206,52 @@ async function getAgentResponse(messages, whatsapp, name) {
     
     const data = await response.json();
     
-    // Se rate limit, tentar próxima chave
-    if (data.error?.code === 429 || response.status === 429) {
-      console.log('Rate limit, tentando próxima chave...');
-      const nextKey = getNextModalKey();
-      const retryResponse = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
+    // GLM-5 pode retornar content ou reasoning_content
+    const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
+    
+    if (responseText) {
+      console.log('✅ Modal GLM-5 respondeu!');
+      return responseText;
+    }
+    
+    console.error('Modal falhou:', JSON.stringify(data).substring(0, 200));
+    
+    // FALLBACK: Usar Groq se Modal falhar
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      console.error('GROQ_API_KEY não configurada');
+      return null;
+    }
+    
+    console.log('⚠️ Modal falhou - usando Groq...');
+    
+    try {
+      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${nextKey}`
+          'Authorization': `Bearer ${groqKey}`
         },
         body: JSON.stringify({
-          model: 'zai-org/GLM-5-FP8',
+          model: 'llama-3.3-70b-versatile',
           messages: formattedMessages,
           temperature: 0.9,
           max_tokens: 500
         })
       });
-      const retryData = await retryResponse.json();
-      if (retryData.choices?.[0]?.message?.content) {
-        return retryData.choices[0].message.content;
+      
+      const groqData = await groqResponse.json();
+      if (groqData.choices?.[0]?.message?.content) {
+        console.log('✅ Groq respondeu!');
+        return groqData.choices[0].message.content;
       }
+    } catch (e) {
+      console.error('Groq também falhou:', e.message);
     }
     
-    const responseText = data.choices?.[0]?.message?.content;
-    
-    if (responseText) {
-      console.log('Modal GLM-5 respondeu com sucesso!');
-      return responseText;
-    }
-    
-    console.error('Modal falhou:', JSON.stringify(data));
     return null;
   } catch (e) {
-    console.error('Erro no Modal:', e.message);
+    console.error('Erro no agente:', e.message);
     return null;
   }
 }

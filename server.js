@@ -1252,8 +1252,12 @@ app.post('/webhook/evolution', async (req, res) => {
     // O admin usa o OpenClaw (Robotic) - clientes usam o Ligadinho
     // Só transferir se for REALMENTE o admin (João: 559180124904)
     const ADMIN_WHATSAPP = '559180124904';
+    
+    // DEBUG: Log detalhado
+    console.log(`🔍 DEBUG: fromMe=${fromMe}, whatsapp=${whatsapp}, isAdmin=${whatsapp === ADMIN_WHATSAPP}`);
+    
     if (fromMe === true && whatsapp === ADMIN_WHATSAPP) {
-      console.log('Mensagem do admin (fromMe) detectada - transferindo para OpenClaw');
+      console.log('✅ Mensagem do admin (fromMe) detectada - transferindo para OpenClaw');
       
       // Transferir para OpenClaw via webhook
       try {

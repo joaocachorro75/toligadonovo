@@ -111,6 +111,23 @@ const CREATE_TABLES = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_whatsapp (whatsapp)
+  )`,
+  `CREATE TABLE IF NOT EXISTS clients (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    company VARCHAR(255),
+    instance_name VARCHAR(100) UNIQUE,
+    instance_status VARCHAR(50) DEFAULT 'pending',
+    instance_qrcode TEXT,
+    webhook_url VARCHAR(500),
+    agent_prompt TEXT,
+    agent_active BOOLEAN DEFAULT true,
+    plan VARCHAR(50) DEFAULT 'basic',
+    monthly_price DECIMAL(10,2) DEFAULT 99.90,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`
 ];
 
@@ -1233,8 +1250,9 @@ app.post('/webhook/evolution', async (req, res) => {
     
     // CRÍTICO: Transferir mensagens fromMe (admin) para OpenClaw
     // O admin usa o OpenClaw (Robotic) - clientes usam o Ligadinho
-    // Mensagens do admin são transferidas para o OpenClaw responder
-    if (fromMe === true) {
+    // Só transferir se for REALMENTE o admin (João: 559180124904)
+    const ADMIN_WHATSAPP = '559180124904';
+    if (fromMe === true && whatsapp === ADMIN_WHATSAPP) {
       console.log('Mensagem do admin (fromMe) detectada - transferindo para OpenClaw');
       
       // Transferir para OpenClaw via webhook
@@ -1526,6 +1544,436 @@ app.get('/api/conversations/:whatsapp', async (req, res) => {
   
   const messages = typeof conversation.messages === 'string' ? JSON.parse(conversation.messages) : conversation.messages;
   res.json({ ...conversation, messages });
+});
+
+// ============================================
+// CLIENTS CRUD - PAINEL ADMIN
+// ============================================
+
+// Listar todos os clientes
+app.get('/api/clients', async (req, res) => {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query(
+        'SELECT * FROM clients ORDER BY created_at DESC'
+      );
+      res.json(rows);
+    } catch (e) {
+      console.error('Erro ao listar clientes:', e.message);
+      res.json([]);
+    }
+  } else {
+    // Fallback JSON
+    const db = loadDB();
+    res.json(db.clients || []);
+  }
+});
+
+// Buscar cliente por ID
+app.get('/api/clients/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query(
+        'SELECT * FROM clients WHERE id = ?',
+        [id]
+      );
+      if (rows.length > 0) {
+        res.json(rows[0]);
+      } else {
+        res.status(404).json({ error: 'Cliente não encontrado' });
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    const db = loadDB();
+    const client = (db.clients || []).find(c => c.id == id);
+    if (client) {
+      res.json(client);
+    } else {
+      res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+  }
+});
+
+// Criar novo cliente
+app.post('/api/clients', async (req, res) => {
+  const { name, email, phone, company, plan, monthly_price, agent_prompt } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Nome é obrigatório' });
+  }
+  
+  // Gerar nome da instância baseado no nome da empresa
+  const instanceName = (company || name)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .substring(0, 20) + '_' + Date.now().toString(36);
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      const [result] = await mysqlPool.query(
+        `INSERT INTO clients (name, email, phone, company, instance_name, plan, monthly_price, agent_prompt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, email, phone, company, instanceName, plan || 'basic', monthly_price || 99.90, agent_prompt || null]
+      );
+      
+      const clientId = result.insertId;
+      
+      // Criar instância na Evolution API
+      const evolutionResult = await createEvolutionInstance(instanceName);
+      
+      // Atualizar com QR Code se disponível
+      if (evolutionResult.qrcode) {
+        await mysqlPool.query(
+          'UPDATE clients SET instance_qrcode = ?, instance_status = ? WHERE id = ?',
+          [evolutionResult.qrcode, 'qrcode', clientId]
+        );
+      }
+      
+      const [newClient] = await mysqlPool.query('SELECT * FROM clients WHERE id = ?', [clientId]);
+      res.json({ success: true, client: newClient[0], evolution: evolutionResult });
+    } catch (e) {
+      console.error('Erro ao criar cliente:', e.message);
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    // Fallback JSON
+    const db = loadDB();
+    if (!db.clients) db.clients = [];
+    
+    const newClient = {
+      id: Date.now(),
+      name,
+      email,
+      phone,
+      company,
+      instance_name: instanceName,
+      instance_status: 'pending',
+      instance_qrcode: null,
+      plan: plan || 'basic',
+      monthly_price: monthly_price || 99.90,
+      agent_prompt,
+      agent_active: true,
+      created_at: new Date().toISOString()
+    };
+    
+    db.clients.push(newClient);
+    saveDB();
+    
+    // Criar instância na Evolution API
+    const evolutionResult = await createEvolutionInstance(instanceName);
+    
+    res.json({ success: true, client: newClient, evolution: evolutionResult });
+  }
+});
+
+// Atualizar cliente
+app.put('/api/clients/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, email, phone, company, plan, monthly_price, agent_prompt, agent_active } = req.body;
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query(
+        `UPDATE clients SET name = ?, email = ?, phone = ?, company = ?, plan = ?, monthly_price = ?, agent_prompt = ?, agent_active = ? WHERE id = ?`,
+        [name, email, phone, company, plan, monthly_price, agent_prompt, agent_active, id]
+      );
+      
+      const [updated] = await mysqlPool.query('SELECT * FROM clients WHERE id = ?', [id]);
+      res.json({ success: true, client: updated[0] });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    const db = loadDB();
+    const index = (db.clients || []).findIndex(c => c.id == id);
+    if (index >= 0) {
+      db.clients[index] = { ...db.clients[index], ...req.body, updated_at: new Date().toISOString() };
+      saveDB();
+      res.json({ success: true, client: db.clients[index] });
+    } else {
+      res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+  }
+});
+
+// Deletar cliente
+app.delete('/api/clients/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      // Buscar nome da instância antes de deletar
+      const [rows] = await mysqlPool.query('SELECT instance_name FROM clients WHERE id = ?', [id]);
+      
+      if (rows.length > 0) {
+        const instanceName = rows[0].instance_name;
+        
+        // Deletar instância da Evolution API
+        await deleteEvolutionInstance(instanceName);
+        
+        // Deletar do banco
+        await mysqlPool.query('DELETE FROM clients WHERE id = ?', [id]);
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Cliente não encontrado' });
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    const db = loadDB();
+    const index = (db.clients || []).findIndex(c => c.id == id);
+    if (index >= 0) {
+      const instanceName = db.clients[index].instance_name;
+      await deleteEvolutionInstance(instanceName);
+      db.clients.splice(index, 1);
+      saveDB();
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+  }
+});
+
+// ============================================
+// EVOLUTION API - GESTÃO DE INSTÂNCIAS
+// ============================================
+
+const EVOLUTION_BASE_URL = process.env.EVOLUTION_BASE_URL || 'https://automacao-evolution-api.nfeujb.easypanel.host';
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '5BE128D18942-4B09-8AF8-454ADEEB06B1';
+
+// Criar instância na Evolution API
+async function createEvolutionInstance(instanceName) {
+  try {
+    console.log(`Criando instância Evolution: ${instanceName}`);
+    
+    // Webhook URL para receber mensagens
+    const webhookUrl = process.env.WEBHOOK_URL || 'https://claw-toligadonovo.ow2qbi.easypanel.host/webhook/evolution';
+    
+    const response = await fetch(`${EVOLUTION_BASE_URL}/instance/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY
+      },
+      body: JSON.stringify({
+        instanceName: instanceName,
+        webhook: webhookUrl,
+        webhook_by_events: true,
+        events: ['messages.upsert', 'connection.update', 'qrcode.updated']
+      })
+    });
+    
+    const data = await response.json();
+    console.log('Evolution API response:', JSON.stringify(data));
+    
+    // Conectar instância para gerar QR Code
+    const connectResponse = await fetch(`${EVOLUTION_BASE_URL}/instance/connect/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': EVOLUTION_API_KEY
+      }
+    });
+    
+    const connectData = await connectResponse.json();
+    console.log('Connect response:', JSON.stringify(connectData));
+    
+    return {
+      success: true,
+      instance: data,
+      qrcode: connectData.base64 || connectData.qrcode || null,
+      code: connectData.code || null
+    };
+  } catch (e) {
+    console.error('Erro ao criar instância:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+// Buscar QR Code da instância
+async function getInstanceQRCode(instanceName) {
+  try {
+    const response = await fetch(`${EVOLUTION_BASE_URL}/instance/connect/${instanceName}`, {
+      method: 'GET',
+      headers: {
+        'apikey': EVOLUTION_API_KEY
+      }
+    });
+    
+    const data = await response.json();
+    return {
+      success: true,
+      qrcode: data.base64 || data.qrcode || null,
+      code: data.code || null,
+      status: data.status || 'unknown'
+    };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Status da instância
+async function getInstanceStatus(instanceName) {
+  try {
+    const response = await fetch(`${EVOLUTION_BASE_URL}/instance/fetchInstances`, {
+      method: 'GET',
+      headers: {
+        'apikey': EVOLUTION_API_KEY
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (Array.isArray(data)) {
+      const instance = data.find(i => i.name === instanceName);
+      if (instance) {
+        return {
+          success: true,
+          status: instance.connectionStatus || 'close',
+          owner: instance.ownerJid,
+          profileName: instance.profileName
+        };
+      }
+    }
+    
+    return { success: false, status: 'not_found' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Deletar instância
+async function deleteEvolutionInstance(instanceName) {
+  try {
+    const response = await fetch(`${EVOLUTION_BASE_URL}/instance/delete/${instanceName}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': EVOLUTION_API_KEY
+      }
+    });
+    
+    return { success: response.ok };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Rota para buscar QR Code de um cliente
+app.get('/api/clients/:id/qrcode', async (req, res) => {
+  const { id } = req.params;
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT instance_name FROM clients WHERE id = ?', [id]);
+      
+      if (rows.length > 0) {
+        const instanceName = rows[0].instance_name;
+        const qrData = await getInstanceQRCode(instanceName);
+        
+        // Atualizar status no banco
+        if (qrData.qrcode) {
+          await mysqlPool.query(
+            'UPDATE clients SET instance_qrcode = ?, instance_status = ? WHERE id = ?',
+            [qrData.qrcode, 'qrcode', id]
+          );
+        }
+        
+        res.json(qrData);
+      } else {
+        res.status(404).json({ error: 'Cliente não encontrado' });
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    res.status(400).json({ error: 'Requer MySQL' });
+  }
+});
+
+// Rota para status da instância
+app.get('/api/clients/:id/status', async (req, res) => {
+  const { id } = req.params;
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT instance_name FROM clients WHERE id = ?', [id]);
+      
+      if (rows.length > 0) {
+        const instanceName = rows[0].instance_name;
+        const statusData = await getInstanceStatus(instanceName);
+        
+        // Atualizar status no banco
+        if (statusData.success) {
+          await mysqlPool.query(
+            'UPDATE clients SET instance_status = ? WHERE id = ?',
+            [statusData.status, id]
+          );
+        }
+        
+        res.json(statusData);
+      } else {
+        res.status(404).json({ error: 'Cliente não encontrado' });
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    res.status(400).json({ error: 'Requer MySQL' });
+  }
+});
+
+// Rota para listar todas as instâncias Evolution
+app.get('/api/evolution/instances', async (req, res) => {
+  try {
+    const response = await fetch(`${EVOLUTION_BASE_URL}/instance/fetchInstances`, {
+      method: 'GET',
+      headers: {
+        'apikey': EVOLUTION_API_KEY
+      }
+    });
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Rota para reconectar instância
+app.post('/api/clients/:id/reconnect', async (req, res) => {
+  const { id } = req.params;
+  
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query('SELECT instance_name FROM clients WHERE id = ?', [id]);
+      
+      if (rows.length > 0) {
+        const instanceName = rows[0].instance_name;
+        const qrData = await getInstanceQRCode(instanceName);
+        
+        if (qrData.qrcode) {
+          await mysqlPool.query(
+            'UPDATE clients SET instance_qrcode = ?, instance_status = ? WHERE id = ?',
+            [qrData.qrcode, 'qrcode', id]
+          );
+        }
+        
+        res.json(qrData);
+      } else {
+        res.status(404).json({ error: 'Cliente não encontrado' });
+      }
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  } else {
+    res.status(400).json({ error: 'Requer MySQL' });
+  }
 });
 
 // SPA Fallback

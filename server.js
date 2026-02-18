@@ -169,10 +169,10 @@ const INITIAL_DATA = {
       contactDescription: 'Não deixe sua empresa parada no tempo. A tecnologia avança rápido.'
     },
     evolution: {
-        enabled: false,
-        baseUrl: 'https://api.evolution-api.com',
-        instanceName: 'minha-instancia',
-        apiKey: '',
+        enabled: true,
+        baseUrl: 'https://automacao-evolution-api.nfeujb.easypanel.host',
+        instanceName: 'toligado',
+        apiKey: '5BE128D18942-4B09-8AF8-454ADEEB06B1',
         welcomeMessage: 'Olá! Recebemos seu pedido de *{produto}*.',
         reminderMessage: 'Olá *{cliente}*! Lembrete de renovação.'
     }
@@ -873,7 +873,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 // ElevenLabs para TTS (Text to Speech)
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'; // Rachel (feminino, inglês - funciona no WhatsApp)
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'IKne3meq5aSn9XLyUdCD'; // Charlie (masculino, português BR)
 
 async function transcribeAudio(audioUrl) {
   try {
@@ -1390,43 +1390,59 @@ app.post('/webhook/evolution', async (req, res) => {
       const config = await loadConfig();
       console.log(`Áudio recebido de ${whatsapp}, processando...`);
       
+      // Log detalhado do áudio
+      console.log('🔊 audioMessage completa:', JSON.stringify(message?.audioMessage || message, null, 2));
+      
       let transcribedText = null;
       
       try {
-        // Usar Evolution API para obter áudio descriptografado
+        // Usar Evolution API v2 para obter áudio descriptografado
         const msgKey = data.data?.key;
+        const msgMessage = data.data?.message;
         
-        // Endpoint para obter mídia em base64
-        const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/getBase64Media/${config.evolution.instanceName}`, {
+        console.log('🔑 msgKey:', JSON.stringify(msgKey, null, 2));
+        
+        // Endpoint correto da Evolution API v2
+        const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/getBase64FromMediaMessage/${config.evolution.instanceName}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'apikey': config.evolution.apiKey
           },
           body: JSON.stringify({
-            message: msgKey
+            message: {
+              key: msgKey,
+              message: msgMessage
+            }
           })
         });
         
+        console.log('📡 Resposta Evolution:', mediaResponse.status, mediaResponse.statusText);
+        
         if (mediaResponse.ok) {
           const mediaData = await mediaResponse.json();
+          console.log('📦 mediaData:', JSON.stringify(mediaData).substring(0, 200));
           const base64Audio = mediaData.base64 || mediaData.media;
           
           if (base64Audio) {
             const audioBuffer = Buffer.from(base64Audio, 'base64');
             console.log(`Áudio descriptografado: ${audioBuffer.length} bytes`);
             
-            // Transcrever com ElevenLabs
+            // Transcrever com Groq Whisper
             transcribedText = await transcribeAudioBuffer(audioBuffer);
           }
         } else {
+          const errorText = await mediaResponse.text();
+          console.error('❌ Erro Evolution:', errorText);
+          
           // Fallback: tentar URL direta (pode funcionar em alguns casos)
           const audioUrl = message?.audioMessage?.url;
           if (audioUrl) {
-            console.log('Tentando URL direta...');
+            console.log('Tentando URL direta:', audioUrl.substring(0, 100));
             const audioResponse = await fetch(audioUrl);
             if (audioResponse.ok) {
               const audioBuffer = await audioResponse.buffer();
+              console.log('📦 Buffer size:', audioBuffer.length);
               if (audioBuffer.length > 1000) { // Arquivo válido tem mais de 1KB
                 transcribedText = await transcribeAudioBuffer(audioBuffer);
               }

@@ -1036,73 +1036,135 @@ Respondas sempre em português brasileiro, de forma bem humana!`;
 
 // Buscar ou criar conversa
 async function getConversation(whatsapp) {
-  if (!useMySQL || !mysqlPool) return null;
+  // MySQL mode
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query(
+        'SELECT * FROM conversations WHERE whatsapp = ?',
+        [whatsapp]
+      );
+      
+      if (rows.length > 0) {
+        return rows[0];
+      }
+      
+      // Criar nova conversa
+      await mysqlPool.query(
+        'INSERT INTO conversations (whatsapp, messages, stage) VALUES (?, ?, ?)',
+        [whatsapp, JSON.stringify([]), 'welcome']
+      );
+      
+      const [newRows] = await mysqlPool.query(
+        'SELECT * FROM conversations WHERE whatsapp = ?',
+        [whatsapp]
+      );
+      
+      return newRows[0];
+    } catch (e) {
+      console.error('Erro ao buscar conversa (MySQL):', e.message);
+      // Fallback para JSON
+    }
+  }
+  
+  // JSON fallback - usar arquivo local
+  const CONVERSATIONS_FILE = path.join(DATA_DIR, 'conversations.json');
   
   try {
-    const [rows] = await mysqlPool.query(
-      'SELECT * FROM conversations WHERE whatsapp = ?',
-      [whatsapp]
-    );
+    let conversations = {};
+    if (fs.existsSync(CONVERSATIONS_FILE)) {
+      conversations = JSON.parse(fs.readFileSync(CONVERSATIONS_FILE, 'utf8'));
+    }
     
-    if (rows.length > 0) {
-      return rows[0];
+    if (conversations[whatsapp]) {
+      return conversations[whatsapp];
     }
     
     // Criar nova conversa
-    await mysqlPool.query(
-      'INSERT INTO conversations (whatsapp, messages, stage) VALUES (?, ?, ?)',
-      [whatsapp, JSON.stringify([]), 'welcome']
-    );
+    conversations[whatsapp] = {
+      whatsapp,
+      messages: [],
+      stage: 'welcome',
+      created_at: new Date().toISOString()
+    };
     
-    const [newRows] = await mysqlPool.query(
-      'SELECT * FROM conversations WHERE whatsapp = ?',
-      [whatsapp]
-    );
-    
-    return newRows[0];
+    fs.writeFileSync(CONVERSATIONS_FILE, JSON.stringify(conversations, null, 2));
+    return conversations[whatsapp];
   } catch (e) {
-    console.error('Erro ao buscar conversa:', e.message);
+    console.error('Erro ao buscar conversa (JSON):', e.message);
     return null;
   }
 }
 
 // Salvar mensagem na conversa
 async function saveMessage(whatsapp, role, content, name = null, interest = null, stage = null) {
-  if (!useMySQL || !mysqlPool) return;
+  // MySQL mode
+  if (useMySQL && mysqlPool) {
+    try {
+      // Buscar mensagens atuais
+      const [rows] = await mysqlPool.query(
+        'SELECT messages FROM conversations WHERE whatsapp = ?',
+        [whatsapp]
+      );
+      
+      const messages = rows.length > 0 ? (typeof rows[0].messages === 'string' ? JSON.parse(rows[0].messages) : rows[0].messages) : [];
+      messages.push({ role, content, timestamp: Date.now() });
+      
+      // Atualizar
+      let updateQuery = 'UPDATE conversations SET messages = ?, updated_at = NOW()';
+      const updateParams = [JSON.stringify(messages)];
+      
+      if (name) {
+        updateQuery += ', name = ?';
+        updateParams.push(name);
+      }
+      if (interest) {
+        updateQuery += ', interest = ?';
+        updateParams.push(interest);
+      }
+      if (stage) {
+        updateQuery += ', stage = ?';
+        updateParams.push(stage);
+      }
+      
+      updateQuery += ' WHERE whatsapp = ?';
+      updateParams.push(whatsapp);
+      
+      await mysqlPool.query(updateQuery, updateParams);
+      return;
+    } catch (e) {
+      console.error('Erro ao salvar mensagem (MySQL):', e.message);
+      // Fallback para JSON
+    }
+  }
+  
+  // JSON fallback
+  const CONVERSATIONS_FILE = path.join(DATA_DIR, 'conversations.json');
   
   try {
-    // Buscar mensagens atuais
-    const [rows] = await mysqlPool.query(
-      'SELECT messages FROM conversations WHERE whatsapp = ?',
-      [whatsapp]
-    );
+    let conversations = {};
+    if (fs.existsSync(CONVERSATIONS_FILE)) {
+      conversations = JSON.parse(fs.readFileSync(CONVERSATIONS_FILE, 'utf8'));
+    }
     
-    const messages = rows.length > 0 ? (typeof rows[0].messages === 'string' ? JSON.parse(rows[0].messages) : rows[0].messages) : [];
+    if (!conversations[whatsapp]) {
+      conversations[whatsapp] = {
+        whatsapp,
+        messages: [],
+        stage: 'welcome'
+      };
+    }
+    
+    const messages = conversations[whatsapp].messages || [];
     messages.push({ role, content, timestamp: Date.now() });
+    conversations[whatsapp].messages = messages;
     
-    // Atualizar
-    let updateQuery = 'UPDATE conversations SET messages = ?, updated_at = NOW()';
-    const updateParams = [JSON.stringify(messages)];
+    if (name) conversations[whatsapp].name = name;
+    if (interest) conversations[whatsapp].interest = interest;
+    if (stage) conversations[whatsapp].stage = stage;
     
-    if (name) {
-      updateQuery += ', name = ?';
-      updateParams.push(name);
-    }
-    if (interest) {
-      updateQuery += ', interest = ?';
-      updateParams.push(interest);
-    }
-    if (stage) {
-      updateQuery += ', stage = ?';
-      updateParams.push(stage);
-    }
-    
-    updateQuery += ' WHERE whatsapp = ?';
-    updateParams.push(whatsapp);
-    
-    await mysqlPool.query(updateQuery, updateParams);
+    fs.writeFileSync(CONVERSATIONS_FILE, JSON.stringify(conversations, null, 2));
   } catch (e) {
-    console.error('Erro ao salvar mensagem:', e.message);
+    console.error('Erro ao salvar mensagem (JSON):', e.message);
   }
 }
 

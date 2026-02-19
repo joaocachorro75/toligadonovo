@@ -1027,7 +1027,7 @@ ${productsList}
 2. **Descoberta**: Descubra o que a pessoa FAZ, o que ela PRECISA
 3. **Apresentação**: Apresente o produto ideal para ela (use os preços!)
 4. **Quebra de objeções**: Tire dúvidas, mostre benefícios
-5. **FECHAMENTO**: Quando der sinal, mande o link: https://claw-toligadonovo.ow2qbi.easypanel.host
+5. **FECHAMENTO**: Quando der sinal, mande o link: https://to-ligado.com
 
 ### Técnicas de vendas:
 - Pergunte: "Qual seu nome?" se não disse

@@ -159,6 +159,7 @@ const INITIAL_DATA = {
     whatsapp: '5591980124904',
     adminPassword: 'admin123',
     pix: { keyType: 'email', key: 'contato@to-ligado.com', beneficiary: 'To-Ligado Soluções' },
+    ligadinhoPaused: false,
     home: {
       heroTitle: 'Sua Empresa',
       heroHighlight: 'No Futuro Agora',
@@ -648,6 +649,29 @@ app.get('/api/config', async (req, res) => res.json(await loadConfig()));
 app.post('/api/config', async (req, res) => {
   await saveConfig(req.body);
   res.json({ success: true });
+});
+
+// Ligadinho pause/resume
+app.get('/api/ligadinho/status', async (req, res) => {
+  const config = await loadConfig();
+  res.json({ 
+    paused: config.ligadinhoPaused || false,
+    status: config.ligadinhoPaused ? 'paused' : 'active'
+  });
+});
+
+app.post('/api/ligadinho/pause', async (req, res) => {
+  const config = await loadConfig();
+  config.ligadinhoPaused = true;
+  await saveConfig(config);
+  res.json({ success: true, status: 'paused', message: 'Ligadinho pausado!' });
+});
+
+app.post('/api/ligadinho/resume', async (req, res) => {
+  const config = await loadConfig();
+  config.ligadinhoPaused = false;
+  await saveConfig(config);
+  res.json({ success: true, status: 'active', message: 'Ligadinho ativo!' });
 });
 
 app.get('/api/products', async (req, res) => res.json(await loadProducts()));
@@ -1382,6 +1406,13 @@ app.post('/webhook/evolution', async (req, res) => {
     recentMessages.set(msgId, true);
     // Limpar cache após 10 segundos
     setTimeout(() => recentMessages.delete(msgId), 10000);
+    
+    // Verificar se Ligadinho está pausado
+    const configPaused = await loadConfig();
+    if (configPaused.ligadinhoPaused) {
+      console.log('⏸️ Ligadinho pausado - ignorando mensagem');
+      return res.json({ ok: true, paused: true });
+    }
     
     // Se for áudio, transcrever e responder em áudio
     let wasAudio = false; // Marcar se a mensagem original era áudio

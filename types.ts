@@ -103,6 +103,16 @@ export interface Client {
   instance_name: string;
   instance_qrcode?: string;
   instance_status?: 'pending' | 'connected' | 'disconnected';
+  // Configurações da Instância Evolution (só admin vê/edita)
+  evolution_api_url?: string;
+  evolution_api_key?: string;
+  evolution_webhook_url?: string;
+  // API Keys do Agente IA (só admin vê/edita)
+  modal_api_key?: string;
+  groq_api_key?: string;
+  elevenlabs_api_key?: string;
+  elevenlabs_voice_id?: string;
+  // Dados do plano
   plan?: string;
   monthly_price?: number;
   agent_prompt?: string;

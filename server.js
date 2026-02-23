@@ -127,7 +127,14 @@ const CREATE_TABLES = [
     plan VARCHAR(50) DEFAULT 'basic',
     monthly_price DECIMAL(10,2) DEFAULT 99.90,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    evolution_api_url VARCHAR(500),
+    evolution_api_key VARCHAR(255),
+    evolution_webhook_url VARCHAR(500),
+    modal_api_key VARCHAR(255),
+    groq_api_key VARCHAR(255),
+    elevenlabs_api_key VARCHAR(255),
+    elevenlabs_voice_id VARCHAR(100)
   )`
 ];
 
@@ -1725,7 +1732,11 @@ app.get('/api/clients/:id', async (req, res) => {
 
 // Criar novo cliente
 app.post('/api/clients', async (req, res) => {
-  const { name, email, phone, company, plan, monthly_price, agent_prompt } = req.body;
+  const { 
+    name, email, phone, company, plan, monthly_price, agent_prompt,
+    evolution_api_url, evolution_api_key, evolution_webhook_url,
+    modal_api_key, groq_api_key, elevenlabs_api_key, elevenlabs_voice_id
+  } = req.body;
   
   if (!name) {
     return res.status(400).json({ error: 'Nome é obrigatório' });
@@ -1742,15 +1753,21 @@ app.post('/api/clients', async (req, res) => {
   if (useMySQL && mysqlPool) {
     try {
       const [result] = await mysqlPool.query(
-        `INSERT INTO clients (name, email, phone, company, instance_name, plan, monthly_price, agent_prompt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, email, phone, company, instanceName, plan || 'basic', monthly_price || 99.90, agent_prompt || null]
+        `INSERT INTO clients (name, email, phone, company, instance_name, plan, monthly_price, agent_prompt,
+          evolution_api_url, evolution_api_key, evolution_webhook_url,
+          modal_api_key, groq_api_key, elevenlabs_api_key, elevenlabs_voice_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, email, phone, company, instanceName, plan || 'basic', monthly_price || 99.90, agent_prompt || null,
+         evolution_api_url || null, evolution_api_key || null, evolution_webhook_url || null,
+         modal_api_key || null, groq_api_key || null, elevenlabs_api_key || null, elevenlabs_voice_id || null]
       );
       
       const clientId = result.insertId;
       
-      // Criar instância na Evolution API
-      const evolutionResult = await createEvolutionInstance(instanceName);
+      // Criar instância na Evolution API (usar config do cliente ou padrão)
+      const apiUrl = evolution_api_url || EVOLUTION_API_URL;
+      const apiKey = evolution_api_key || EVOLUTION_API_KEY;
+      const evolutionResult = await createEvolutionInstance(instanceName, apiUrl, apiKey);
       
       // Atualizar com QR Code se disponível
       if (evolutionResult.qrcode) {
@@ -1784,6 +1801,13 @@ app.post('/api/clients', async (req, res) => {
       monthly_price: monthly_price || 99.90,
       agent_prompt,
       agent_active: true,
+      evolution_api_url,
+      evolution_api_key,
+      evolution_webhook_url,
+      modal_api_key,
+      groq_api_key,
+      elevenlabs_api_key,
+      elevenlabs_voice_id,
       created_at: new Date().toISOString()
     };
     
@@ -1791,7 +1815,7 @@ app.post('/api/clients', async (req, res) => {
     saveDB();
     
     // Criar instância na Evolution API
-    const evolutionResult = await createEvolutionInstance(instanceName);
+    const evolutionResult = await createEvolutionInstance(instanceName, evolution_api_url, evolution_api_key);
     
     res.json({ success: true, client: newClient, evolution: evolutionResult });
   }
@@ -1800,13 +1824,21 @@ app.post('/api/clients', async (req, res) => {
 // Atualizar cliente
 app.put('/api/clients/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, email, phone, company, plan, monthly_price, agent_prompt, agent_active } = req.body;
+  const { 
+    name, email, phone, company, plan, monthly_price, agent_prompt, agent_active,
+    evolution_api_url, evolution_api_key, evolution_webhook_url,
+    modal_api_key, groq_api_key, elevenlabs_api_key, elevenlabs_voice_id
+  } = req.body;
   
   if (useMySQL && mysqlPool) {
     try {
       await mysqlPool.query(
-        `UPDATE clients SET name = ?, email = ?, phone = ?, company = ?, plan = ?, monthly_price = ?, agent_prompt = ?, agent_active = ? WHERE id = ?`,
-        [name, email, phone, company, plan, monthly_price, agent_prompt, agent_active, id]
+        `UPDATE clients SET name = ?, email = ?, phone = ?, company = ?, plan = ?, monthly_price = ?, 
+         agent_prompt = ?, agent_active = ?, evolution_api_url = ?, evolution_api_key = ?, evolution_webhook_url = ?,
+         modal_api_key = ?, groq_api_key = ?, elevenlabs_api_key = ?, elevenlabs_voice_id = ? WHERE id = ?`,
+        [name, email, phone, company, plan, monthly_price, agent_prompt, agent_active,
+         evolution_api_url, evolution_api_key, evolution_webhook_url,
+         modal_api_key, groq_api_key, elevenlabs_api_key, elevenlabs_voice_id, id]
       );
       
       const [updated] = await mysqlPool.query('SELECT * FROM clients WHERE id = ?', [id]);

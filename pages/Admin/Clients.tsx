@@ -5,7 +5,7 @@ import {
   Plus, Trash2, Edit, Save, X, QrCode, RefreshCw, 
   Smartphone, DollarSign, Building, Mail, Phone, 
   MessageSquare, CheckCircle, XCircle, AlertTriangle,
-  Copy, ExternalLink, Wifi, WifiOff
+  Copy, ExternalLink, Wifi, WifiOff, Key
 } from 'lucide-react';
 
 const EVOLUTION_API_URL = 'https://automacao-evolution-api.nfeujb.easypanel.host';
@@ -48,7 +48,14 @@ export const AdminClients: React.FC = () => {
       plan: 'basic',
       monthly_price: 0,
       agent_prompt: '',
-      agent_active: false
+      agent_active: false,
+      evolution_api_url: '',
+      evolution_api_key: '',
+      evolution_webhook_url: '',
+      modal_api_key: '',
+      groq_api_key: '',
+      elevenlabs_api_key: '',
+      elevenlabs_voice_id: ''
     });
   };
 
@@ -354,6 +361,109 @@ export const AdminClients: React.FC = () => {
           <label htmlFor="agent_active" className="text-sm text-gray-300">
             Agente de IA ativo
           </label>
+        </div>
+      </div>
+
+      {/* Configurações da Instância Evolution - Só Admin vê */}
+      <div className="border-t border-gray-700 pt-4 mt-4">
+        <h4 className="text-lg font-semibold text-cyan-400 mb-4 flex items-center gap-2">
+          <Wifi className="w-5 h-5" /> Configurações da Instância Evolution
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Evolution API URL
+            </label>
+            <input
+              type="url"
+              value={editingClient?.evolution_api_url || ''}
+              onChange={e => setEditingClient({ ...editingClient, evolution_api_url: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="https://sua-evolution-api.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Evolution API Key
+            </label>
+            <input
+              type="password"
+              value={editingClient?.evolution_api_key || ''}
+              onChange={e => setEditingClient({ ...editingClient, evolution_api_key: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="Chave da API"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Webhook URL (opcional)
+            </label>
+            <input
+              type="url"
+              value={editingClient?.evolution_webhook_url || ''}
+              onChange={e => setEditingClient({ ...editingClient, evolution_webhook_url: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="https://seu-webhook.com/evolution"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* API Keys do Agente IA - Só Admin vê */}
+      <div className="border-t border-gray-700 pt-4 mt-4">
+        <h4 className="text-lg font-semibold text-purple-400 mb-4 flex items-center gap-2">
+          <Key className="w-5 h-5" /> API Keys do Agente IA
+        </h4>
+        <p className="text-xs text-gray-500 mb-4">Cada cliente pode ter suas próprias chaves para rate limits separados.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Modal API Key
+            </label>
+            <input
+              type="password"
+              value={editingClient?.modal_api_key || ''}
+              onChange={e => setEditingClient({ ...editingClient, modal_api_key: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="sk-..."
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Groq API Key
+            </label>
+            <input
+              type="password"
+              value={editingClient?.groq_api_key || ''}
+              onChange={e => setEditingClient({ ...editingClient, groq_api_key: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="gsk_..."
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              ElevenLabs API Key
+            </label>
+            <input
+              type="password"
+              value={editingClient?.elevenlabs_api_key || ''}
+              onChange={e => setEditingClient({ ...editingClient, elevenlabs_api_key: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="sk_..."
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              ElevenLabs Voice ID
+            </label>
+            <input
+              type="text"
+              value={editingClient?.elevenlabs_voice_id || ''}
+              onChange={e => setEditingClient({ ...editingClient, elevenlabs_voice_id: e.target.value })}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500 font-mono text-sm"
+              placeholder="IKne3meq5aSn9XLyUdCD"
+            />
+          </div>
         </div>
       </div>
 

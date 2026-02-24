@@ -86,42 +86,15 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Services Grid */}
-      <section id="servicos" className="py-24 bg-gray-950 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">{config.home.servicesTitle}</h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">{config.home.servicesDescription}</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product) => (
-              <div key={product.id} className="group relative bg-gray-900 rounded-3xl p-1 border border-gray-800 hover:border-cyan-500/50 transition-all hover:-translate-y-2 duration-300">
-                <div className="bg-gray-900 h-full rounded-[20px] p-8 flex flex-col">
-                  <div className="mb-6 flex justify-between items-start">
-                    <div className="w-14 h-14 rounded-2xl bg-gray-800 flex items-center justify-center group-hover:bg-cyan-500/20 group-hover:text-cyan-400 transition-colors">
-                      {getIcon(product.slug)}
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">{product.title}</h3>
-                  <p className="text-gray-400 mb-8 text-sm line-clamp-3 flex-1">{product.shortDescription}</p>
-                  <button onClick={() => navigate(`/produto/${product.slug}`)} className="w-full py-3 rounded-xl bg-gray-800 text-white font-semibold text-sm hover:bg-cyan-600 transition-colors">Ver Detalhes</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SaaS Solutions Section */}
-      <section className="py-24 bg-black border-t border-gray-900">
+      {/* SaaS Solutions Section - PRIMEIRO! */}
+      <section className="py-24 bg-gray-950 border-t border-gray-900">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold uppercase tracking-wider mb-6">
-              <Zap className="w-4 h-4" /> Novos Produtos SaaS
+              <Zap className="w-4 h-4" /> Soluções SaaS
             </span>
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Soluções Inteligentes</h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">Ferramentas prontas pra usar, sem complicação. Comece hoje mesmo!</p>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Ferramentas Prontas pra Usar</h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">Comece hoje mesmo! Sem complicação, sem setup, sem dor de cabeça.</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -145,22 +118,49 @@ export const Home: React.FC = () => {
             </a>
 
             {/* Agentes IA */}
-            <a href="https://automacao-agentesaas.nfeujb.easypanel.host" target="_blank" rel="noopener noreferrer" className="group">
+            <a href="https://agentes.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
               <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-3xl p-8 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:-translate-y-2 h-full">
                 <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center mb-6">
                   <Smartphone className="w-8 h-8 text-cyan-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-3">Agente IA WhatsApp</h3>
-                <p className="text-gray-400 mb-6">Atendente virtual inteligente para WhatsApp. Trabalha 24h por dia, nunca cansa, sempre pronto pra vender!</p>
+                <p className="text-gray-400 mb-6">Assistente inteligente personalizado para seu negócio. Pode ser atendente, vendedor, suporte e muito mais!</p>
                 <div className="flex items-center gap-4 mb-6">
                   <span className="text-3xl font-bold text-white">R$ 199</span>
                   <span className="text-gray-500">/mês</span>
                 </div>
                 <div className="flex items-center gap-2 text-cyan-400 font-semibold">
-                  Saiba mais <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  Criar Meu Agente <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Services Grid - OUTROS PRODUTOS */}
+      <section id="servicos" className="py-24 bg-black relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Outras Soluções</h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">Serviços personalizados para impulsionar seu negócio.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {products.map((product) => (
+              <div key={product.id} className="group relative bg-gray-900 rounded-3xl p-1 border border-gray-800 hover:border-cyan-500/50 transition-all hover:-translate-y-2 duration-300">
+                <div className="bg-gray-900 h-full rounded-[20px] p-8 flex flex-col">
+                  <div className="mb-6 flex justify-between items-start">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-800 flex items-center justify-center group-hover:bg-cyan-500/20 group-hover:text-cyan-400 transition-colors">
+                      {getIcon(product.slug)}
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">{product.title}</h3>
+                  <p className="text-gray-400 mb-8 text-sm line-clamp-3 flex-1">{product.shortDescription}</p>
+                  <button onClick={() => navigate(`/produto/${product.slug}`)} className="w-full py-3 rounded-xl bg-gray-800 text-white font-semibold text-sm hover:bg-cyan-600 transition-colors">Ver Detalhes</button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

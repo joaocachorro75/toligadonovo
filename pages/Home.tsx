@@ -113,6 +113,58 @@ export const Home: React.FC = () => {
         </div>
       </section>
 
+      {/* SaaS Solutions Section */}
+      <section className="py-24 bg-black border-t border-gray-900">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold uppercase tracking-wider mb-6">
+              <Zap className="w-4 h-4" /> Novos Produtos SaaS
+            </span>
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Soluções Inteligentes</h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">Ferramentas prontas pra usar, sem complicação. Comece hoje mesmo!</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* PdvCel */}
+            <a href="https://pdvcel.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
+              <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 rounded-3xl p-8 border border-indigo-500/30 hover:border-indigo-400 transition-all hover:-translate-y-2 h-full">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 flex items-center justify-center mb-6">
+                  <ShoppingCart className="w-8 h-8 text-indigo-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">PdvCel</h3>
+                <p className="text-gray-400 mb-6">Sistema de PDV 100% mobile para mercadinhos, lojas, ambulantes e salões. Venda mais com praticidade!</p>
+                <div className="flex items-center gap-4 mb-6">
+                  <span className="text-3xl font-bold text-white">R$ 29</span>
+                  <span className="text-gray-500">/mês</span>
+                  <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-bold">2 dias grátis</span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-400 font-semibold">
+                  Começar agora <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </a>
+
+            {/* Agentes IA */}
+            <a href="https://automacao-agentesaas.nfeujb.easypanel.host" target="_blank" rel="noopener noreferrer" className="group">
+              <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-3xl p-8 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:-translate-y-2 h-full">
+                <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center mb-6">
+                  <Smartphone className="w-8 h-8 text-cyan-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Agente IA WhatsApp</h3>
+                <p className="text-gray-400 mb-6">Atendente virtual inteligente para WhatsApp. Trabalha 24h por dia, nunca cansa, sempre pronto pra vender!</p>
+                <div className="flex items-center gap-4 mb-6">
+                  <span className="text-3xl font-bold text-white">R$ 199</span>
+                  <span className="text-gray-500">/mês</span>
+                </div>
+                <div className="flex items-center gap-2 text-cyan-400 font-semibold">
+                  Saiba mais <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Blog Section */}
       <section className="py-24 bg-black border-t border-gray-900">
         <div className="max-w-7xl mx-auto px-4">

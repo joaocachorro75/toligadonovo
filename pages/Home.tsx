@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Star, Zap, ShoppingCart, Globe, Smartphone, Palette, Layout, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { ArrowRight, Star, Zap, ShoppingCart, Globe, Smartphone, Palette, Layout, CheckCircle2, RefreshCcw, Check } from 'lucide-react';
 import { db } from '../services/db';
 import { Product, SiteConfig, BlogPost } from '../types';
 import { LeadForm } from '../components/LeadForm';

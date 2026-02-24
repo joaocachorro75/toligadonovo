@@ -101,36 +101,75 @@ export const Home: React.FC = () => {
             {/* PdvCel */}
             <a href="https://pdvcel.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
               <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 rounded-3xl p-8 border border-indigo-500/30 hover:border-indigo-400 transition-all hover:-translate-y-2 h-full">
-                <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 flex items-center justify-center mb-6">
-                  <ShoppingCart className="w-8 h-8 text-indigo-400" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3">PdvCel</h3>
-                <p className="text-gray-400 mb-6">Sistema de PDV 100% mobile para mercadinhos, lojas, ambulantes e salões. Venda mais com praticidade!</p>
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-3xl font-bold text-white">R$ 29</span>
-                  <span className="text-gray-500">/mês</span>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
+                    <ShoppingCart className="w-8 h-8 text-indigo-400" />
+                  </div>
                   <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-bold">2 dias grátis</span>
                 </div>
-                <div className="flex items-center gap-2 text-indigo-400 font-semibold">
-                  Começar agora <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <h3 className="text-2xl font-bold text-white mb-2">PdvCel</h3>
+                <p className="text-gray-400 mb-6">Sistema de PDV 100% mobile para mercadinhos, lojas, ambulantes e salões.</p>
+                <div className="mb-4">
+                  <span className="text-gray-500 text-sm">A partir de</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-white">R$ 29</span>
+                    <span className="text-gray-500">/mês</span>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-6">
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> Controle de estoque
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> Histórico de vendas
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> 100% mobile
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-indigo-400 text-sm">3 planos disponíveis</span>
+                  <span className="flex items-center gap-2 text-indigo-400 font-semibold">
+                    Começar grátis <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </span>
                 </div>
               </div>
             </a>
 
             {/* Agentes IA */}
             <a href="https://agentes.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
-              <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-3xl p-8 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:-translate-y-2 h-full">
-                <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center mb-6">
-                  <Smartphone className="w-8 h-8 text-cyan-400" />
+              <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-3xl p-8 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:-translate-y-2 h-full relative overflow-hidden">
+                <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">Mais vendido</div>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center">
+                    <Smartphone className="w-8 h-8 text-cyan-400" />
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Agente IA WhatsApp</h3>
-                <p className="text-gray-400 mb-6">Assistente inteligente personalizado para seu negócio. Pode ser atendente, vendedor, suporte e muito mais!</p>
-                <div className="flex items-center gap-4 mb-6">
-                  <span className="text-3xl font-bold text-white">R$ 199</span>
-                  <span className="text-gray-500">/mês</span>
+                <h3 className="text-2xl font-bold text-white mb-2">Agente IA WhatsApp</h3>
+                <p className="text-gray-400 mb-6">Assistente inteligente personalizado. Vendedor, suporte, agendamentos e mais!</p>
+                <div className="mb-4">
+                  <span className="text-gray-500 text-sm">A partir de</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-white">R$ 199</span>
+                    <span className="text-gray-500">/mês</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-cyan-400 font-semibold">
-                  Criar Meu Agente <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <div className="space-y-2 mb-6">
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-cyan-400" /> Atendimento 24h automático
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-cyan-400" /> Treinado pro seu negócio
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-cyan-400" /> Integração WhatsApp
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-cyan-400 text-sm">3 planos disponíveis</span>
+                  <span className="flex items-center gap-2 text-cyan-400 font-semibold">
+                    Criar meu agente <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </span>
                 </div>
               </div>
             </a>

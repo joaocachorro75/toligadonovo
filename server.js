@@ -884,25 +884,24 @@ app.post('/api/orders', async (req, res) => {
   }
   
   // Agentes IA - WhatsApp
-  if (order.productSlug === 'agente-ia' || order.productTitle?.toLowerCase().includes('agente')) {
+  if (order.productSlug === 'agente-ia-whatsapp' || order.productTitle?.toLowerCase().includes('agente')) {
     try {
-      // Criar cliente no SaaS de Agentes
-      const agentesRes = await fetch('https://agentes.to-ligado.com/api/clients', {
+      // Criar cliente no SaaS de Agentes via registro público
+      const agentesRes = await fetch('https://agentes.to-ligado.com/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: order.customerName,
-          email: `${order.customerWhatsapp}@temp.com`,
-          phone: order.customerWhatsapp,
-          plan: 'starter'
+          name: order.customerName || 'Cliente',
+          whatsapp: order.customerWhatsapp,
+          password: 'mudar123'
         })
       });
       if (agentesRes.ok) {
-        const agentData = await agentesRes.json();
         saasAccount = {
           type: 'agentes',
           url: 'https://agentes.to-ligado.com',
-          clientId: agentData.clientId
+          login: order.customerWhatsapp,
+          password: 'mudar123'
         };
       }
     } catch (e) {

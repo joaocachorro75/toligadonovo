@@ -16,6 +16,83 @@ const FormData = global.FormData || require('form-data');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ============================================
+// SISTEMA DE RENOVAÇÕES E LEMBRETES
+// ============================================
+
+// Verificar assinaturas vencendo e enviar lembretes
+async function checkSubscriptions() {
+  console.log('[CRON] Verificando assinaturas...');
+  
+  const orders = await loadOrders();
+  const config = await loadConfig();
+  const now = Date.now();
+  
+  const oneDay = 24 * 60 * 60 * 1000;
+  const threeDays = 3 * oneDay;
+  const sevenDays = 7 * oneDay;
+  
+  let remindersSent = 0;
+  let blocked = 0;
+  
+  for (const order of orders) {
+    if (!order.isSubscription || !order.dueDate) continue;
+    
+    const timeUntilDue = order.dueDate - now;
+    
+    // Assinatura vencida - bloquear
+    if (timeUntilDue < 0 && order.subscriptionStatus === 'active') {
+      order.subscriptionStatus = 'overdue';
+      await saveOrder(order);
+      blocked++;
+      
+      // Notificar cliente
+      if (config.evolution?.enabled && order.customerWhatsapp) {
+        const msg = `⚠️ *Assinatura Vencida!*\n\n📦 Produto: ${order.productTitle}\n\nSua assinatura venceu. Regularize para continuar usando!\n\n🔗 https://site.to-ligado.com`;
+        await sendEvolutionMessage(order.customerWhatsapp, msg);
+      }
+      continue;
+    }
+    
+    // Lembrete 3 dias antes
+    if (timeUntilDue > 0 && timeUntilDue <= threeDays && order.reminderSent !== '3d') {
+      order.reminderSent = '3d';
+      await saveOrder(order);
+      remindersSent++;
+      
+      if (config.evolution?.enabled && order.customerWhatsapp) {
+        const msg = `📅 *Lembrete de Renovação*\n\n📦 ${order.productTitle}\n💵 Valor: R$ ${(order.price || 0).toFixed(2)}\n\nSua assinatura vence em 3 dias! Renove agora para não perder o acesso.\n\n🔗 https://site.to-ligado.com`;
+        await sendEvolutionMessage(order.customerWhatsapp, msg);
+      }
+    }
+    
+    // Lembrete 7 dias antes
+    if (timeUntilDue > threeDays && timeUntilDue <= sevenDays && order.reminderSent !== '7d') {
+      order.reminderSent = '7d';
+      await saveOrder(order);
+      remindersSent++;
+      
+      if (config.evolution?.enabled && order.customerWhatsapp) {
+        const msg = `📅 *Renovação em Breve*\n\n📦 ${order.productTitle}\n💵 Valor: R$ ${(order.price || 0).toFixed(2)}\n\nSua assinatura vence em 7 dias.\n\n🔗 https://site.to-ligado.com`;
+        await sendEvolutionMessage(order.customerWhatsapp, msg);
+      }
+    }
+  }
+  
+  console.log(`[CRON] Verificação completa: ${remindersSent} lembretes enviados, ${blocked} assinaturas bloqueadas`);
+  return { remindersSent, blocked };
+}
+
+// Executar verificação a cada 6 horas
+setInterval(checkSubscriptions, 6 * 60 * 60 * 1000);
+
+// Executar na inicialização
+setTimeout(checkSubscriptions, 30000); // 30 segundos após iniciar
+
+// ============================================
+// FIM DO SISTEMA DE RENOVAÇÕES
+// ============================================
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -988,6 +1065,56 @@ app.post('/api/sync/sale', async (req, res) => {
     console.error('Erro ao sincronizar venda:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Endpoint manual para verificar assinaturas
+app.post('/api/cron/check-subscriptions', async (req, res) => {
+  const result = await checkSubscriptions();
+  res.json({ success: true, ...result });
+});
+
+// Endpoint para renovar assinatura
+app.post('/api/orders/:id/renew', async (req, res) => {
+  const orders = await loadOrders();
+  const order = orders.find(o => o.id === req.params.id);
+  
+  if (!order) {
+    return res.status(404).json({ error: 'Pedido não encontrado' });
+  }
+  
+  // Renovar por mais 30 dias
+  order.dueDate = Date.now() + (30 * 24 * 60 * 60 * 1000);
+  order.subscriptionStatus = 'active';
+  order.reminderSent = null;
+  order.lastRenewal = Date.now();
+  
+  await saveOrder(order);
+  
+  // Notificar cliente
+  const config = await loadConfig();
+  if (config.evolution?.enabled && order.customerWhatsapp) {
+    const msg = `✅ *Assinatura Renovada!*\n\n📦 ${order.productTitle}\n\nNova data de vencimento: ${new Date(order.dueDate).toLocaleDateString('pt-BR')}\n\nObrigado por continuar conosco!`;
+    await sendEvolutionMessage(order.customerWhatsapp, msg);
+  }
+  
+  res.json({ success: true, newDueDate: order.dueDate });
+});
+
+// Endpoint para listar assinaturas vencendo
+app.get('/api/subscriptions/upcoming', async (req, res) => {
+  const orders = await loadOrders();
+  const now = Date.now();
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  
+  const upcoming = orders
+    .filter(o => o.isSubscription && o.dueDate && (o.dueDate - now) <= sevenDays && (o.dueDate - now) > 0)
+    .sort((a, b) => a.dueDate - b.dueDate);
+  
+  const overdue = orders
+    .filter(o => o.isSubscription && o.subscriptionStatus === 'overdue')
+    .sort((a, b) => b.dueDate - a.dueDate);
+  
+  res.json({ upcoming, overdue });
 });
 
 app.post('/api/upload', upload.single('image'), (req, res) => {

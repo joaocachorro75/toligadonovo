@@ -293,6 +293,34 @@ const INITIAL_DATA = {
       heroImage: 'https://images.unsplash.com/photo-1626785774573-4b799312c95d?auto=format&fit=crop&q=80&w=2000',
       features: ['Design Exclusivo', 'Arquivos em Alta', 'Revisões Ilimitadas'],
       ctaText: 'Solicitar Design'
+    },
+    {
+      id: '9',
+      slug: 'pdvcel',
+      title: 'PdvCel - PDV Mobile',
+      menuTitle: 'PDV Mobile',
+      shortDescription: 'Sistema de PDV 100% mobile para lojas e ambulantes.',
+      fullDescription: 'Sistema completo de ponto de venda no celular. Ideal para mercadinhos, lanchonetes, salões e ambulantes. Gerencie vendas, estoque e histórico no palm da sua mão!',
+      price: 29.00,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&q=80&w=2000',
+      features: ['100% Mobile', 'Controle de Estoque', 'Histórico de Vendas', '2 dias grátis'],
+      ctaText: 'Começar Grátis'
+    },
+    {
+      id: '10',
+      slug: 'agente-ia-whatsapp',
+      title: 'Agente IA para WhatsApp',
+      menuTitle: 'Agente IA',
+      shortDescription: 'Atendente virtual inteligente 24h no WhatsApp.',
+      fullDescription: 'Tenha um atendente virtual que nunca dorme, nunca cansa e está sempre pronto para vender! Responde automaticamente, qualifica leads e fecha vendas.',
+      price: 199.00,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&q=80&w=2000',
+      features: ['Atendimento 24h', 'Respostas Inteligentes', 'Vendas Automáticas', 'Sem limite de mensagens'],
+      ctaText: 'Contratar Agente'
     }
   ],
   posts: [
@@ -813,23 +841,101 @@ app.get('/api/orders', async (req, res) => res.json(await loadOrders()));
 
 app.post('/api/orders', async (req, res) => {
   const order = req.body;
+  
+  // Adicionar data de criação e vencimento para assinaturas
+  order.createdAt = Date.now();
+  if (order.isSubscription) {
+    // Vencimento em 30 dias para mensal, 365 para anual
+    const days = order.billingCycle === 'yearly' ? 365 : 30;
+    order.dueDate = Date.now() + (days * 24 * 60 * 60 * 1000);
+    order.subscriptionStatus = 'active';
+  }
+  
   await saveOrder(order);
   
   const config = await loadConfig();
   
+  // Integração com SaaS (PdvCel e Agentes IA)
+  let saasAccount = null;
+  
+  // PdvCel - PDV Mobile
+  if (order.productSlug === 'pdvcel' || order.productTitle?.toLowerCase().includes('pdv')) {
+    try {
+      const pdvcelRes = await fetch('https://pdvcel.to-ligado.com/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsapp: order.customerWhatsapp,
+          shop_name: order.customerName || 'Minha Loja',
+          password: 'mudar123' // Senha padrão, cliente altera depois
+        })
+      });
+      if (pdvcelRes.ok) {
+        saasAccount = {
+          type: 'pdvcel',
+          url: 'https://pdvcel.to-ligado.com',
+          login: order.customerWhatsapp,
+          password: 'mudar123'
+        };
+      }
+    } catch (e) {
+      console.error('Erro ao criar conta PdvCel:', e);
+    }
+  }
+  
+  // Agentes IA - WhatsApp
+  if (order.productSlug === 'agente-ia' || order.productTitle?.toLowerCase().includes('agente')) {
+    try {
+      // Criar cliente no SaaS de Agentes
+      const agentesRes = await fetch('https://agentes.to-ligado.com/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: order.customerName,
+          email: `${order.customerWhatsapp}@temp.com`,
+          phone: order.customerWhatsapp,
+          plan: 'starter'
+        })
+      });
+      if (agentesRes.ok) {
+        const agentData = await agentesRes.json();
+        saasAccount = {
+          type: 'agentes',
+          url: 'https://agentes.to-ligado.com',
+          clientId: agentData.clientId
+        };
+      }
+    } catch (e) {
+      console.error('Erro ao criar conta Agentes IA:', e);
+    }
+  }
+  
   // Notificar admin no WhatsApp
   if (config.evolution?.enabled && config.whatsapp) {
-    const msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}`;
+    let msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}`;
+    if (saasAccount) {
+      msg += `\n\n🔗 *Conta criada no ${saasAccount.type}*`;
+      if (saasAccount.login) msg += `\nLogin: ${saasAccount.login}`;
+      if (saasAccount.password) msg += `\nSenha: ${saasAccount.password}`;
+    }
     await sendEvolutionMessage(config.whatsapp, msg);
   }
   
   // Enviar confirmação para o comprador
   if (config.evolution?.enabled && order.customerWhatsapp) {
-    const confirmMsg = `✅ *Pedido Confirmado!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}\n\nObrigado pela preferência!`;
+    let confirmMsg = `✅ *Pedido Confirmado!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}`;
+    
+    if (saasAccount) {
+      confirmMsg += `\n\n🎁 *Sua conta está pronta!*\n🔗 Acesse: ${saasAccount.url}`;
+      if (saasAccount.login) confirmMsg += `\n📱 Login: ${saasAccount.login}`;
+      if (saasAccount.password) confirmMsg += `\n🔑 Senha: ${saasAccount.password}`;
+    }
+    
+    confirmMsg += '\n\nObrigado pela preferência!';
     await sendEvolutionMessage(order.customerWhatsapp, confirmMsg);
   }
   
-  res.json({ success: true });
+  res.json({ success: true, saasAccount });
 });
 
 app.put('/api/orders/:id', async (req, res) => {

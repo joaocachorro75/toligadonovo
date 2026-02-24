@@ -861,21 +861,22 @@ app.post('/api/orders', async (req, res) => {
   // PdvCel - PDV Mobile
   if (order.productSlug === 'pdvcel' || order.productTitle?.toLowerCase().includes('pdv')) {
     try {
-      const pdvcelRes = await fetch('https://pdvcel.to-ligado.com/api/auth/signup', {
+      const pdvcelRes = await fetch('https://pdvcel.to-ligado.com/api/sync/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          whatsapp: order.customerWhatsapp,
-          shop_name: order.customerName || 'Minha Loja',
-          password: 'mudar123' // Senha padrão, cliente altera depois
+          order: order,
+          apiKey: 'toligado_sync_2026'
         })
       });
       if (pdvcelRes.ok) {
+        const data = await pdvcelRes.json();
         saasAccount = {
           type: 'pdvcel',
           url: 'https://pdvcel.to-ligado.com',
           login: order.customerWhatsapp,
-          password: 'mudar123'
+          password: 'mudar123',
+          tenantId: data.tenantId
         };
       }
     } catch (e) {
@@ -945,6 +946,48 @@ app.put('/api/orders/:id', async (req, res) => {
 app.delete('/api/orders/:id', async (req, res) => {
   await deleteOrder(req.params.id);
   res.json({ success: true });
+});
+
+// Webhook para receber vendas dos SaaS (PdvCel, Agentes IA)
+app.post('/api/sync/sale', async (req, res) => {
+  const { order, source, apiKey } = req.body;
+  
+  // Verificar API key (segurança)
+  if (apiKey !== 'toligado_sync_2026') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    // Criar order no site principal
+    const newOrder = {
+      id: `${source}_${order.id || Date.now()}`,
+      productTitle: order.productTitle || `${source} - Assinatura`,
+      productSlug: source,
+      price: order.price || 29,
+      customerName: order.customerName,
+      customerWhatsapp: order.customerWhatsapp,
+      isSubscription: true,
+      billingCycle: 'monthly',
+      createdAt: Date.now(),
+      dueDate: Date.now() + (30 * 24 * 60 * 60 * 1000),
+      subscriptionStatus: 'active',
+      source: source
+    };
+    
+    await saveOrder(newOrder);
+    
+    // Notificar admin
+    const config = await loadConfig();
+    if (config.evolution?.enabled && config.whatsapp) {
+      const msg = `🔄 *Venda Sincronizada!*\n\n📦 Origem: ${source}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price || 29},00`;
+      await sendEvolutionMessage(config.whatsapp, msg);
+    }
+    
+    res.json({ success: true, orderId: newOrder.id });
+  } catch (err) {
+    console.error('Erro ao sincronizar venda:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/upload', upload.single('image'), (req, res) => {

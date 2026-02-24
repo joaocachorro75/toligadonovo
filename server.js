@@ -313,14 +313,14 @@ const INITIAL_DATA = {
       slug: 'agente-ia-whatsapp',
       title: 'Agente IA para WhatsApp',
       menuTitle: 'Agente IA',
-      shortDescription: 'Atendente virtual inteligente 24h no WhatsApp.',
-      fullDescription: 'Tenha um atendente virtual que nunca dorme, nunca cansa e está sempre pronto para vender! Responde automaticamente, qualifica leads e fecha vendas.',
+      shortDescription: 'Assistente inteligente personalizado para seu negócio.',
+      fullDescription: 'Crie um agente de IA personalizado para WhatsApp! Pode ser atendente, vendedor, suporte, assistente de imóveis, agendamentos, e muito mais. Configuramos do seu jeito!',
       price: 199.00,
       paymentType: 'recurring',
       billingCycle: 'monthly',
       heroImage: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&q=80&w=2000',
-      features: ['Atendimento 24h', 'Respostas Inteligentes', 'Vendas Automáticas', 'Sem limite de mensagens'],
-      ctaText: 'Contratar Agente'
+      features: ['Personalizado para seu negócio', 'Atendimento 24h', 'Vendas automáticas', 'Suporte inteligente'],
+      ctaText: 'Criar Meu Agente'
     }
   ],
   posts: [

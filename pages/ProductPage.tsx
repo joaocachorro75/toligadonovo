@@ -72,6 +72,7 @@ export const ProductPage: React.FC = () => {
   const handleSendProof = async () => {
     if (!config || !product) return;
     await db.addOrder(product.title, product.price, customerName || 'Cliente', whatsappContact || '00', {
+       productSlug: product.slug,
        isSubscription: product.paymentType === 'recurring',
        billingCycle: product.billingCycle,
        setupFee: product.setupFee

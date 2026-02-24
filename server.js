@@ -20,74 +20,7 @@ const PORT = process.env.PORT || 3000;
 // SISTEMA DE RENOVAÇÕES E LEMBRETES
 // ============================================
 
-// Verificar assinaturas vencendo e enviar lembretes
-async function checkSubscriptions() {
-  console.log('[CRON] Verificando assinaturas...');
-  
-  const orders = await loadOrders();
-  const config = await loadConfig();
-  const now = Date.now();
-  
-  const oneDay = 24 * 60 * 60 * 1000;
-  const threeDays = 3 * oneDay;
-  const sevenDays = 7 * oneDay;
-  
-  let remindersSent = 0;
-  let blocked = 0;
-  
-  for (const order of orders) {
-    if (!order.isSubscription || !order.dueDate) continue;
-    
-    const timeUntilDue = order.dueDate - now;
-    
-    // Assinatura vencida - bloquear
-    if (timeUntilDue < 0 && order.subscriptionStatus === 'active') {
-      order.subscriptionStatus = 'overdue';
-      await saveOrder(order);
-      blocked++;
-      
-      // Notificar cliente
-      if (config.evolution?.enabled && order.customerWhatsapp) {
-        const msg = `⚠️ *Assinatura Vencida!*\n\n📦 Produto: ${order.productTitle}\n\nSua assinatura venceu. Regularize para continuar usando!\n\n🔗 https://site.to-ligado.com`;
-        await sendEvolutionMessage(order.customerWhatsapp, msg);
-      }
-      continue;
-    }
-    
-    // Lembrete 3 dias antes
-    if (timeUntilDue > 0 && timeUntilDue <= threeDays && order.reminderSent !== '3d') {
-      order.reminderSent = '3d';
-      await saveOrder(order);
-      remindersSent++;
-      
-      if (config.evolution?.enabled && order.customerWhatsapp) {
-        const msg = `📅 *Lembrete de Renovação*\n\n📦 ${order.productTitle}\n💵 Valor: R$ ${(order.price || 0).toFixed(2)}\n\nSua assinatura vence em 3 dias! Renove agora para não perder o acesso.\n\n🔗 https://site.to-ligado.com`;
-        await sendEvolutionMessage(order.customerWhatsapp, msg);
-      }
-    }
-    
-    // Lembrete 7 dias antes
-    if (timeUntilDue > threeDays && timeUntilDue <= sevenDays && order.reminderSent !== '7d') {
-      order.reminderSent = '7d';
-      await saveOrder(order);
-      remindersSent++;
-      
-      if (config.evolution?.enabled && order.customerWhatsapp) {
-        const msg = `📅 *Renovação em Breve*\n\n📦 ${order.productTitle}\n💵 Valor: R$ ${(order.price || 0).toFixed(2)}\n\nSua assinatura vence em 7 dias.\n\n🔗 https://site.to-ligado.com`;
-        await sendEvolutionMessage(order.customerWhatsapp, msg);
-      }
-    }
-  }
-  
-  console.log(`[CRON] Verificação completa: ${remindersSent} lembretes enviados, ${blocked} assinaturas bloqueadas`);
-  return { remindersSent, blocked };
-}
-
-// Executar verificação a cada 6 horas
-setInterval(checkSubscriptions, 6 * 60 * 60 * 1000);
-
-// Executar na inicialização
-setTimeout(checkSubscriptions, 30000); // 30 segundos após iniciar
+// NOTA: Função checkSubscriptions movida para depois das funções auxiliares
 
 // ============================================
 // FIM DO SISTEMA DE RENOVAÇÕES

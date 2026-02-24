@@ -1331,6 +1331,49 @@ function extractName(text) {
   return null;
 }
 
+// Endpoint para SaaS usar Modal (proxy)
+app.post('/api/ai/chat', async (req, res) => {
+  const { messages, system_prompt, max_tokens = 500 } = req.body;
+  
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: 'messages é obrigatório' });
+  }
+  
+  try {
+    const formattedMessages = [
+      ...(system_prompt ? [{ role: 'system', content: system_prompt }] : []),
+      ...messages
+    ];
+    
+    const apiKey = getNextModalKey();
+    
+    const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'zai-org/GLM-5-FP8',
+        messages: formattedMessages,
+        temperature: 0.9,
+        max_tokens
+      })
+    });
+    
+    const data = await response.json();
+    const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
+    
+    if (responseText) {
+      return res.json({ success: true, response: responseText });
+    }
+    
+    return res.status(500).json({ error: 'Modal falhou', details: data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Extrair interesse
 function extractInterest(text) {
   const products = [

@@ -820,6 +820,29 @@ const sendEvolutionMessage = async (to, text) => {
 // --- Routes ---
 app.get('/health', (req, res) => res.status(200).json({ status: 'OK', database: useMySQL ? 'MySQL' : 'JSON' }));
 
+// Debug endpoint para verificar configuração MySQL
+app.get('/debug-mysql', (req, res) => {
+  res.json({
+    useMySQL: useMySQL,
+    mysqlConfigured: !!(MYSQL_CONFIG.host && MYSQL_CONFIG.user && MYSQL_CONFIG.database),
+    config: {
+      host: MYSQL_CONFIG.host || 'não configurado',
+      user: MYSQL_CONFIG.user || 'não configurado',
+      database: MYSQL_CONFIG.database || 'não configurado',
+      port: MYSQL_CONFIG.port
+    },
+    env: {
+      DB_HOST: process.env.DB_HOST ? 'definido' : 'não definido',
+      DB_USER: process.env.DB_USER ? 'definido' : 'não definido',
+      DB_PASSWORD: process.env.DB_PASSWORD ? 'definido' : 'não definido',
+      DB_NAME: process.env.DB_NAME ? 'definido' : 'não definido',
+      MYSQL_HOST: process.env.MYSQL_HOST ? 'definido' : 'não definido',
+      MYSQL_USER: process.env.MYSQL_USER ? 'definido' : 'não definido',
+      MYSQL_DATABASE: process.env.MYSQL_DATABASE ? 'definido' : 'não definido'
+    }
+  });
+});
+
 app.get('/api/config', async (req, res) => res.json(await loadConfig()));
 
 app.post('/api/config', async (req, res) => {

@@ -61,11 +61,11 @@ let mysqlPool = null;
 let useMySQL = false;
 
 const MYSQL_CONFIG = {
-  host: process.env.MYSQL_HOST || null,
-  port: parseInt(process.env.MYSQL_PORT || '3306'),
-  user: process.env.MYSQL_USER || null,
-  password: process.env.MYSQL_PASSWORD || null,
-  database: process.env.MYSQL_DATABASE || null
+  host: process.env.MYSQL_HOST || process.env.DB_HOST || null,
+  port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || '3306'),
+  user: process.env.MYSQL_USER || process.env.DB_USER || null,
+  password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || null,
+  database: process.env.MYSQL_DATABASE || process.env.DB_NAME || null
 };
 
 // Verifica se MySQL está configurado

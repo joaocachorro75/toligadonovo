@@ -474,9 +474,11 @@ async function loadProducts() {
 async function saveProducts(products) {
   if (useMySQL && mysqlPool) {
     try {
-      await mysqlPool.query('DELETE FROM products');
       for (const product of products) {
-        await mysqlPool.query('INSERT INTO products (id, data) VALUES (?, ?)', [product.id, JSON.stringify(product)]);
+        await mysqlPool.query(
+          'INSERT INTO products (id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)',
+          [product.id, JSON.stringify(product)]
+        );
       }
       return true;
     } catch (e) {
@@ -876,7 +878,9 @@ app.post('/api/ligadinho/resume', async (req, res) => {
 app.get('/api/products', async (req, res) => res.json(await loadProducts()));
 
 app.post('/api/products', async (req, res) => {
-  await saveProducts(req.body);
+  // Aceita tanto array quanto objeto único
+  const products = Array.isArray(req.body) ? req.body : [req.body];
+  await saveProducts(products);
   res.json({ success: true });
 });
 

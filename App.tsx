@@ -7,6 +7,7 @@ import { BlogPostPage } from './pages/BlogPostPage';
 import { AdminLogin } from './pages/Admin/Login';
 import { AdminDashboard } from './pages/Admin/Dashboard';
 import { AdminClients } from './pages/Admin/Clients';
+import { AdminInstructions } from './pages/Admin/Instructions';
 import { db } from './services/db';
 
 const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
@@ -39,6 +40,12 @@ function App() {
         <Route path="/admin/clients" element={
           <ProtectedRoute>
             <AdminClients />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/instructions" element={
+          <ProtectedRoute>
+            <AdminInstructions />
           </ProtectedRoute>
         } />
         

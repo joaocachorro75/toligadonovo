@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, Settings, LogOut, Newspaper, ShoppingCart, Menu, X, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, LogOut, Newspaper, ShoppingCart, Menu, X, Building2, Bot } from 'lucide-react';
 import { db } from '../services/db';
 
 interface AdminLayoutProps {
@@ -20,6 +20,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const navItems = [
     { path: '/admin/clients', icon: Building2, label: 'Clientes' },
+    { path: '/admin/instructions', icon: Bot, label: 'Instruções IA' },
     { path: '/admin/leads', icon: Users, label: 'Leads' },
     { path: '/admin/orders', icon: ShoppingCart, label: 'Vendas/Assinaturas' },
     { path: '/admin/content', icon: FileText, label: 'Produtos' },

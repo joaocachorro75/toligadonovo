@@ -845,6 +845,24 @@ app.get('/debug-mysql', (req, res) => {
   });
 });
 
+// Debug: Ver produtos no banco
+app.get('/debug-products', async (req, res) => {
+  try {
+    if (useMySQL && mysqlPool) {
+      const [rows] = await mysqlPool.query('SELECT id, data FROM products');
+      res.json({ 
+        source: 'MySQL',
+        count: rows.length,
+        products: rows.map(r => ({ id: r.id, ...JSON.parse(r.data) }))
+      });
+    } else {
+      res.json({ source: 'JSON', products: loadDB().products || [] });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/config', async (req, res) => res.json(await loadConfig()));
 
 app.post('/api/config', async (req, res) => {

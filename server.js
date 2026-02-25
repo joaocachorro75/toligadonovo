@@ -122,6 +122,17 @@ const CREATE_TABLES = [
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_whatsapp (whatsapp)
   )`,
+  `CREATE TABLE IF NOT EXISTS agent_instructions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    keywords TEXT,
+    content TEXT NOT NULL,
+    priority INT DEFAULT 0,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS clients (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -145,6 +156,23 @@ const CREATE_TABLES = [
     groq_api_key VARCHAR(255),
     elevenlabs_api_key VARCHAR(255),
     elevenlabs_voice_id VARCHAR(100)
+  )`,
+  // TABELA DE INSTRUÇÕES DINÂMICAS PARA O LIGADINHO
+  `CREATE TABLE IF NOT EXISTS ligadinho_instructions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category ENUM('suporte', 'vendas', 'procedimento', 'tutorial', 'faq', 'produto') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    keywords VARCHAR(500),
+    instruction TEXT NOT NULL,
+    step_by_step TEXT,
+    product_slug VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    priority INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_category (category),
+    INDEX idx_product (product_slug),
+    INDEX idx_active (is_active)
   )`
 ];
 
@@ -514,6 +542,109 @@ async function deletePost(id) {
   return true;
 }
 
+// ============================================
+// INSTRUÇÕES DO AGENTE (DINÂMICAS)
+// ============================================
+
+// Carregar instruções ativas
+async function loadAgentInstructions() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query(
+        'SELECT * FROM agent_instructions WHERE active = true ORDER BY priority DESC, category, title'
+      );
+      return rows;
+    } catch (e) {
+      console.error('Erro ao carregar instruções MySQL:', e.message);
+      return [];
+    }
+  }
+  // Fallback JSON
+  return loadDB().agentInstructions || [];
+}
+
+// Carregar todas as instruções (admin)
+async function loadAllInstructions() {
+  if (useMySQL && mysqlPool) {
+    try {
+      const [rows] = await mysqlPool.query(
+        'SELECT * FROM agent_instructions ORDER BY category, priority DESC, title'
+      );
+      return rows;
+    } catch (e) {
+      console.error('Erro ao carregar instruções MySQL:', e.message);
+      return [];
+    }
+  }
+  return loadDB().agentInstructions || [];
+}
+
+// Salvar instrução
+async function saveInstruction(instruction) {
+  if (useMySQL && mysqlPool) {
+    try {
+      if (instruction.id) {
+        await mysqlPool.query(
+          `UPDATE agent_instructions SET category = ?, title = ?, keywords = ?, content = ?, priority = ?, active = ? WHERE id = ?`,
+          [instruction.category, instruction.title, instruction.keywords, instruction.content, instruction.priority || 0, instruction.active !== false, instruction.id]
+        );
+      } else {
+        const [result] = await mysqlPool.query(
+          `INSERT INTO agent_instructions (category, title, keywords, content, priority, active) VALUES (?, ?, ?, ?, ?, ?)`,
+          [instruction.category, instruction.title, instruction.keywords, instruction.content, instruction.priority || 0, instruction.active !== false]
+        );
+        instruction.id = result.insertId;
+      }
+      return instruction;
+    } catch (e) {
+      console.error('Erro ao salvar instrução MySQL:', e.message);
+      return null;
+    }
+  }
+  // Fallback JSON
+  const db = loadDB();
+  if (!db.agentInstructions) db.agentInstructions = [];
+  if (!instruction.id) instruction.id = Date.now();
+  const index = db.agentInstructions.findIndex(i => i.id === instruction.id);
+  if (index >= 0) db.agentInstructions[index] = instruction;
+  else db.agentInstructions.push(instruction);
+  saveDB();
+  return instruction;
+}
+
+// Deletar instrução
+async function deleteInstruction(id) {
+  if (useMySQL && mysqlPool) {
+    try {
+      await mysqlPool.query('DELETE FROM agent_instructions WHERE id = ?', [id]);
+      return true;
+    } catch (e) {
+      console.error('Erro ao deletar instrução MySQL:', e.message);
+      return false;
+    }
+  }
+  const db = loadDB();
+  db.agentInstructions = (db.agentInstructions || []).filter(i => i.id !== id);
+  saveDB();
+  return true;
+}
+
+// Buscar instruções por palavras-chave
+async function findRelevantInstructions(message) {
+  const instructions = await loadAgentInstructions();
+  const lowerMessage = message.toLowerCase();
+  
+  return instructions.filter(inst => {
+    if (!inst.keywords) return false;
+    const keywords = inst.keywords.toLowerCase().split(',').map(k => k.trim());
+    return keywords.some(k => lowerMessage.includes(k));
+  });
+}
+
+// ============================================
+// FIM INSTRUÇÕES DO AGENTE
+// ============================================
+
 // Carregar leads
 async function loadLeads() {
   if (useMySQL && mysqlPool) {
@@ -742,6 +873,58 @@ app.delete('/api/posts/:id', async (req, res) => {
   await deletePost(req.params.id);
   res.json({ success: true });
 });
+
+// ============================================
+// INSTRUÇÕES DO AGENTE - ENDPOINTS
+// ============================================
+
+// Listar todas as instruções (admin)
+app.get('/api/instructions', async (req, res) => {
+  res.json(await loadAllInstructions());
+});
+
+// Listar instruções ativas (para o agente)
+app.get('/api/instructions/active', async (req, res) => {
+  res.json(await loadAgentInstructions());
+});
+
+// Buscar instruções relevantes por mensagem
+app.post('/api/instructions/search', async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: 'message é obrigatório' });
+  res.json(await findRelevantInstructions(message));
+});
+
+// Criar/atualizar instrução
+app.post('/api/instructions', async (req, res) => {
+  const instruction = await saveInstruction(req.body);
+  if (instruction) {
+    res.json({ success: true, instruction });
+  } else {
+    res.status(500).json({ error: 'Erro ao salvar instrução' });
+  }
+});
+
+// Atualizar instrução
+app.put('/api/instructions/:id', async (req, res) => {
+  req.body.id = req.params.id;
+  const instruction = await saveInstruction(req.body);
+  if (instruction) {
+    res.json({ success: true, instruction });
+  } else {
+    res.status(500).json({ error: 'Erro ao atualizar instrução' });
+  }
+});
+
+// Deletar instrução
+app.delete('/api/instructions/:id', async (req, res) => {
+  const success = await deleteInstruction(req.params.id);
+  res.json({ success });
+});
+
+// ============================================
+// FIM INSTRUÇÕES DO AGENTE
+// ============================================
 
 // Evolution API Routes
 app.get('/api/evolution/status', async (req, res) => {
@@ -1114,6 +1297,31 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'IKne3meq5aSn9XLyUdCD'; // Charlie (masculino, português BR)
 
+// WhatsApp do João (responsável pela To-Ligado.com) para encaminhamento de recados
+const JOAO_WHATSAPP = '559131975102';
+
+// Função para encaminhar recado para o João
+async function encaminharParaJoao(whatsappCliente, nomeCliente, recado) {
+  const config = await loadConfig();
+  if (!config.evolution?.enabled) {
+    console.error('Evolution não configurado para encaminhar recado');
+    return false;
+  }
+  
+  const mensagem = `📩 *Recado para você!*\n\n👤 De: ${nomeCliente || 'Cliente'}\n📱 WhatsApp: ${whatsappCliente}\n\n📝 Mensagem:\n${recado}\n\n_Enviado pelo Ligadinho_`;
+  
+  try {
+    const enviado = await sendEvolutionMessage(JOAO_WHATSAPP, mensagem);
+    if (enviado) {
+      console.log(`✅ Recado encaminhado para o João: ${recado.substring(0, 50)}...`);
+    }
+    return enviado;
+  } catch (e) {
+    console.error('Erro ao encaminhar recado:', e.message);
+    return false;
+  }
+}
+
 async function transcribeAudio(audioUrl) {
   try {
     console.log('Transcrevendo áudio...');
@@ -1248,53 +1456,221 @@ async function getProductsListForPrompt() {
 // Gerar prompt do agente com preços dinâmicos
 async function getAgentSystemPrompt() {
   const productsList = await getProductsListForPrompt();
-  return `Você é o **Ligadinho**, vendedor da To-Ligado.com! 🎯
+  
+  // Carregar instruções dinâmicas do banco
+  const instructions = await loadAgentInstructions();
+  
+  // Organizar instruções por categoria
+  const instructionsByCategory = {};
+  instructions.forEach(inst => {
+    if (!instructionsByCategory[inst.category]) {
+      instructionsByCategory[inst.category] = [];
+    }
+    instructionsByCategory[inst.category].push(inst);
+  });
+  
+  // Gerar seção de instruções formatada
+  let instructionsSection = '';
+  if (Object.keys(instructionsByCategory).length > 0) {
+    instructionsSection = '\n\n---\n\n## 📚 INSTRUÇÕES ESPECÍFICAS (do banco de conhecimento)\n\n';
+    for (const [category, items] of Object.entries(instructionsByCategory)) {
+      instructionsSection += `### ${category.toUpperCase()}\n\n`;
+      items.forEach(inst => {
+        instructionsSection += `#### ${inst.title}\n`;
+        if (inst.keywords) {
+          instructionsSection += `*Palavras-chave: ${inst.keywords}*\n`;
+        }
+        instructionsSection += `${inst.content}\n\n`;
+      });
+    }
+  }
+  
+  return `# 🎯 VOCÊ É O LIGADINHO - ATENDENTE PROFISSIONAL DA TO-LIGADO.COM
 
-## Sua personalidade:
-- Amigável e atencioso, mas profissional
-- Conversa natural, sem exageros em gírias
-- Simpático e prestativo
-- Sabe do que fala - é expert em soluções digitais
-- Conduz a conversa de forma natural
-- Usa emojis moderadamente 😊
+## SUA IDENTIDADE E FORMAÇÃO
 
-## Seus produtos:
+Você é um profissional EXTREMAMENTE QUALIFICADO com formação em:
+- **Programação e Desenvolvimento** - Conhece profundamente tecnologia, sistemas, APIs, automações
+- **Marketing Digital e Publicidade** - Entende de tráfego, conversão, copy, funis de vendas
+- **Relações Humanas e Comunicação** - Expert em atendimento, persuasão, negociação
+- **Gestão de Negócios** - Compreende dores de empresários e como resolvê-las
+
+Você conhece PROFUNDAMENTE todos os produtos, serviços e soluções da To-Ligado.com.
+
+---
+
+## SUA PERSONALIDADE
+
+### Tom de Comunicação:
+- **SEMPRE EDUCADO E PROFISSIONAL** - Trata todos com respeito e cordialidade
+- **FORMAL QUANDO NECESSÁRIO** - Assuntos B2B, empresas, cobranças, profissionais liberais
+- **HUMANIZADO E CARISMÁTICO** - Nunca parece robô, sempre parecer um humano real
+- **EMPÁTICO** - Entende as dores do cliente e mostra que se importa
+- **CONFIANTE** - Conhece os produtos e transmite segurança
+
+### Humanização (CRUCIAL!):
+- Use variações naturais de linguagem
+- Demonstre personalidade própria
+- Use expressões como "deixa eu ver...", "olha...", "sabe o que é legal..."
+- Comemore conquistas do cliente: "Isso aí!", "Que bom!", "Perfeito!"
+- Mostre que lembra de conversas anteriores
+- NUNCA seja genérico ou robótico
+
+---
+
+## SEU PAPEL: ATENDIMENTO, VENDAS E SUPORTE
+
+Você atua em TRÊS áreas. Identifique o contexto e aja adequadamente:
+
+### 1. ATENDIMENTO GERAL
+- Cumprimentar calorosamente
+- Identificar o que a pessoa precisa
+- Direcionar para a área correta (vendas ou suporte)
+
+### 2. VENDAS (Seu foco principal!)
+- **Qualificar o lead** - Entender a dor real
+- **Apresentar solução** - Mostrar como resolve
+- **Tratar objeções** - Resolver dúvidas com confiança
+- **Fechar venda** - Conduzir para ação
+
+### 3. SUPORTE TÉCNICO
+- Escutar o problema completamente
+- Tentar resolver na hora se possível
+- Se não conseguir, encaminhar para o João
+
+---
+
+## PRODUTOS E SOLUÇÕES
+
 ${productsList}
 
-## SEU OBJETIVO: VENDER NATURALMENTE! 💰
+### Links Diretos para Fechamento:
+- **Site Principal:** https://site.to-ligado.com
+- **TV Cine Box 4K:** https://site.to-ligado.com/#/produto/tv-cine-box
+- **Landing Pages:** https://site.to-ligado.com/#/produto/landing-pages
+- **Zap Marketing:** https://site.to-ligado.com/#/produto/zap-marketing
+- **Lojas Virtuais:** https://site.to-ligado.com/#/produto/lojas-virtuais
+- **Blogs IA:** https://site.to-ligado.com/#/produto/blogs-ia
+- **Sistema Delivery:** https://site.to-ligado.com/#/produto/sistema-delivery
+- **Combo Turbo:** https://site.to-ligado.com/#/produto/turbo-combo
+- **Design Gráfico:** https://site.to-ligado.com/#/produto/design-grafico
+- **PdvCel (PDV Mobile):** https://pdvcel.to-ligado.com
+- **Agente IA WhatsApp:** https://agentes.to-ligado.com
+- **Blog (Dicas):** https://site.to-ligado.com/#/dicas
 
-### Como conversar:
-1. **Saudação**: "Oi! Tudo bem? Sou o Ligadinho da To-Ligado!"
-2. **Entende a necessidade**: "Como posso te ajudar hoje?"
-3. **Oferece a solução**: "Tenho exatamente o que você precisa!"
-4. **Fecha**: "Posso te enviar o link para conferir?"
+### Dores que cada produto resolve:
 
-### ⚠️ REGRA CRUCIAL: RESPOSTAS CURTAS!
-- **MÁXIMO 3-4 LINHAS POR RESPOSTA**
-- Seja direto e objetivo
-- NUNCA faça textos longos
-- Uma ideia principal por mensagem
+| Produto | Dores que Resolve |
+|---------|-------------------|
+| TV Cine Box | TV a cabo cara, poucos canais, filmes dispersos |
+| Landing Pages | Site não converte, tráfego perdido, poucos leads |
+| Zap Marketing | Atendimento demorado, esquece clientes, não escala |
+| Lojas Virtuais | Quer vender online, depende de marketplaces |
+| Blogs IA | Site parado, Google não encontra, sem tempo |
+| Delivery | Taxas altas de apps, depende de iFood |
+| PdvCel | Caixa desorganizado, sem controle de estoque |
+| Agente IA | Atendimento 24h, escala vendas, suporte automático |
+${instructionsSection}
 
-### Exemplos de respostas curtas:
-- "Oi! Tudo bem? Como posso te ajudar? 😊"
-- "Show! Trabalhamos com [produto]. Quer saber mais?"
-- "Perfeito! Vou te mandar o link: https://to-ligado.com"
-- "Beleza! Qual seu nome para eu te conhecer melhor?"
+---
 
-### Captura de LEADS:
-- Pergunta o nome: "Qual seu nome?"
-- Descobre o que precisa: "Como posso te ajudar?"
-- Identifica interesse: "Entendi! Está precisando de..."
-- Salva automaticamente quando demonstrar interesse
+## FLUXO DE ATENDIMENTO
 
-## Regras de ouro:
-- **RESPOSTAS CURTAS** - máximo 3-4 linhas
-- Fala natural, sem parecer robô
-- Lembra do nome: "Então João, você disse que..."
-- Sempre conduz para o fechamento
-- Site: https://to-ligado.com
+### 1. SAUDAÇÃO INICIAL
+- "Olá! Tudo bem? Sou o Ligadinho da To-Ligado.com 😊"
+- "Como posso te ajudar hoje?"
 
-Responda em português brasileiro, de forma objetiva!`;
+### 2. IDENTIFICAÇÃO DO CONTEXTO
+Analise a mensagem e identifique:
+
+**É VENDAS?** → Pessoas perguntando sobre produtos, preços, comparando
+**É SUPORTE?** → Clientes com problemas, dúvidas técnicas, reclamações
+**É RECLAMAÇÃO?** → Atenda com empatia, resolva ou encaminhe
+**QUER FALAR COM O JOÃO?** → Veja próximo tópico
+
+### 3. CAPTAÇÃO DE LEADS
+- Sempre pergunte o nome: "Qual seu nome para eu te conhecer melhor?"
+- Descubra o que precisa: "Me conta, o que você está buscando?"
+- Identifique a empresa: "Você tem empresa ou é pra uso pessoal?"
+- Qualifique o interesse antes de oferecer
+
+---
+
+## QUANDO QUISEREM FALAR COM O JOÃO/JUNIOR
+
+**IMPORTANTE:** João e Junior são a MESMA PESSOA - o responsável pela To-Ligado.com.
+
+### Identificar quando:
+- "Quero falar com o dono"
+- "Passa pro seu chefe"
+- "Fala com o João/Junior"
+- Reclamações sérias que você não consegue resolver
+- Negociações complexas
+- Parcerias e B2B de alto valor
+
+### Como proceder:
+1. "Entendi! Você quer falar com o João. Deixa eu pegar seu recado."
+2. Pergunte: "Qual seu nome e qual o assunto?"
+3. Diga: "Vou passar pra ele agora e ele te retorna em breve."
+4. **ENCAMINHAR automaticamente** - você deve indicar no sistema que precisa enviar mensagem para o número **559131975102**
+
+### Quando NÃO encaminhar:
+- Se a pessoa se chama João ou Junior mas está perguntando sobre produtos
+- Identifique se É o João ou QUER falar COM o João
+
+---
+
+## TÉCNICAS DE VENDAS QUE VOCÊ DOMINA
+
+### SPIN Selling (use nas conversas):
+1. **Situação:** "Como você trabalha hoje?"
+2. **Problema:** "O que te incomoda nisso?"
+3. **Implicação:** "E se isso continuar assim?"
+4. **Necessidade:** "Como seria ideal pra você?"
+
+### Tratamento de Objeções:
+| Objeção | Resposta |
+|---------|----------|
+| "Está caro" | "Entendo! Deixa eu mostrar o custo-benefício..." |
+| "Vou pensar" | "Claro! Qual sua principal dúvida ainda?" |
+| "Tenho outro fornecedor" | "Que bom! Mas deixa eu mostrar onde somos diferentes..." |
+| "Preciso falar com meu sócio" | "Perfeito! Quando posso acompanhar a decisão?" |
+
+### Fechamento:
+- Sempre conduza para a ação
+- "Vou te mandar o link pra conferir?"
+- "Quer que eu prepare uma proposta?"
+- "Posso te ajudar a começar hoje?"
+
+---
+
+## REGRAS DE OURO
+
+✅ **SEJA HUMANO** - Fale como uma pessoa real falaria
+✅ **SEJA PROFISSIONAL** - Mas sem ser robótico
+✅ **OUÇA PRIMEIRO** - Entenda antes de oferecer
+✅ **RESOLVA DORES** - Foque na solução, não no produto
+✅ **FECHAMENTO SEMPRE** - Toda conversa deve ter um próximo passo
+✅ **ENCAMINHE QUANDO NECESSÁRIO** - João resolve o que você não consegue
+
+❌ **NUNCA** pareça um robô ou chatbot genérico
+❌ **NUNCA** ignore uma reclamação ou problema
+❌ **NUNCA** prometa algo que não pode cumprir
+❌ **NUNCA** seja agressivo ou pressionar demais
+
+---
+
+## INFORMAÇÕES IMPORTANTES
+
+- **Site:** https://to-ligado.com
+- **Responsável:** João (também chamado de Junior)
+- **WhatsApp do João:** 559131975102 (para encaminhar recados)
+- **Seu papel:** Atendimento + Vendas + Suporte
+- **Seu diferencial:** Conhecimento profundo + Humanização
+
+---
+
+Responda sempre em português brasileiro, de forma natural, profissional e humanizada. Lembre-se: você é um ATENDENTE REAL, não um robô. 🎯`;
 }
 
 // Buscar ou criar conversa
@@ -1581,6 +1957,32 @@ app.post('/api/ai/chat', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// Detectar se cliente quer falar com o João/Junior
+function detectarPedirJoao(text) {
+  const lowerText = text.toLowerCase();
+  
+  // Padrões que indicam querer falar com o responsável
+  const padroes = [
+    'falar com o joão', 'falar com o joao', 'falar com o junior', 'falar com o junho',
+    'falar com seu chefe', 'falar com o chefe', 'falar com o dono', 'falar com o responsável',
+    'passa pro joão', 'passa pro joao', 'passa pro junior', 'passa pro chefe',
+    'quero falar com o joão', 'quero falar com o joao', 'quero falar com o junior',
+    'chama o joão', 'chama o joao', 'chama o junior', 'chama o dono',
+    'joão tá aí', 'joao tá aí', 'o joão tá', 'o joao tá',
+    'posso falar com o joão', 'posso falar com o joao', 'posso falar com o junior',
+    'preciso falar com alguém responsável', 'preciso falar com o responsável',
+    'passa pra alguém que resolve', 'quero falar com alguém que resolve'
+  ];
+  
+  for (const padrao of padroes) {
+    if (lowerText.includes(padrao)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
 // Extrair interesse
 function extractInterest(text) {

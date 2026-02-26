@@ -91,7 +91,7 @@ export const AdminDashboard: React.FC = () => {
       
       const header = "Nome,WhatsApp,Origem,Status,Data\n";
       const rows = leads.map(l => 
-          `"${l.name}","${l.whatsapp}","${l.originPage}","${l.status}","${new Date(l.createdAt).toLocaleDateString()}"`
+          `"${l.name || 'Não informado'}","${l.whatsapp || '-'}","${l.originPage || '-'}","${l.status || 'new'}","${l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-'}"`
       ).join("\n");
       
       downloadCSV(header + rows, `leads-toligado-${new Date().toISOString().split('T')[0]}.csv`);
@@ -103,7 +103,7 @@ export const AdminDashboard: React.FC = () => {
       const header = "Cliente,WhatsApp,Produto,Preço,Tipo,Status,Data Início,Renovação\n";
       const rows = orders.map(o => {
           const nextDate = o.nextPaymentDate ? new Date(o.nextPaymentDate).toLocaleDateString() : '-';
-          return `"${o.customerName}","${o.customerWhatsapp}","${o.productTitle}","${o.productPrice}","${o.isSubscription ? 'Assinatura' : 'Único'}","${o.status}","${new Date(o.createdAt).toLocaleDateString()}","${nextDate}"`;
+          return `"${o.customerName || '-'}","${o.customerWhatsapp || '-'}","${o.productTitle || '-'}","${o.productPrice || 0}","${o.isSubscription ? 'Assinatura' : 'Único'}","${o.status || 'pending'}","${o.createdAt ? new Date(o.createdAt).toLocaleDateString() : '-'}","${nextDate}"`;
       }).join("\n");
       
       downloadCSV(header + rows, `vendas-toligado-${new Date().toISOString().split('T')[0]}.csv`);
@@ -319,15 +319,20 @@ export const AdminDashboard: React.FC = () => {
 
   // --- Formatters ---
   // NO VISUAL FORMATTING FOR DASHBOARD - RAW DATA PREFERRED FOR API DEBUGGING
-  const whatsappLink = (phone: string) => `https://wa.me/${phone.replace(/\+/g, '')}`;
+  const whatsappLink = (phone: string) => {
+    if (!phone) return '#';
+    return `https://wa.me/${phone.replace(/\+/g, '')}`;
+  };
 
   // --- Renders ---
   
   const renderLeads = () => {
-    const filteredLeads = leads.filter(l => 
-      l.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      l.whatsapp.includes(searchTerm)
-    );
+    const filteredLeads = leads.filter(l => {
+      const name = l.name || '';
+      const whatsapp = l.whatsapp || '';
+      return name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             whatsapp.includes(searchTerm);
+    });
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -364,17 +369,17 @@ export const AdminDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {filteredLeads.map((lead) => (
-                <tr key={lead.id}>
-                  <td className="px-6 py-4 font-medium text-white">{lead.name}</td>
+              {filteredLeads.map((lead, index) => (
+                <tr key={lead.id || index}>
+                  <td className="px-6 py-4 font-medium text-white">{lead.name || 'Não informado'}</td>
                   <td className="px-6 py-4">
                     <a href={whatsappLink(lead.whatsapp)} target="_blank" className="flex items-center gap-2 text-green-400 hover:text-green-300 font-mono tracking-wide">
-                      <Phone className="w-4 h-4" /> {lead.whatsapp}
+                      <Phone className="w-4 h-4" /> {lead.whatsapp || '-'}
                     </a>
                   </td>
-                  <td className="px-6 py-4">{lead.originPage}</td>
+                  <td className="px-6 py-4">{lead.originPage || '-'}</td>
                   <td className="px-6 py-4">
-                    <select value={lead.status} onChange={(e) => handleUpdateLeadStatus(lead, e.target.value as any)} className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs">
+                    <select value={lead.status || 'new'} onChange={(e) => handleUpdateLeadStatus(lead, e.target.value as any)} className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs">
                       <option value="new">Novo</option>
                       <option value="contacted">Contatado</option>
                       <option value="closed">Fechado</option>
@@ -421,17 +426,17 @@ export const AdminDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {orders.map((order) => (
-                <tr key={order.id}>
+              {orders.map((order, index) => (
+                <tr key={order.id || index}>
                   <td className="px-6 py-4">
-                    <div className="text-white font-medium">{order.customerName}</div>
+                    <div className="text-white font-medium">{order.customerName || 'Não informado'}</div>
                     <a href={whatsappLink(order.customerWhatsapp)} target="_blank" className="text-xs text-green-400 flex items-center gap-1 mt-1 font-mono tracking-wide">
-                       <Phone className="w-3 h-3" /> {order.customerWhatsapp}
+                       <Phone className="w-3 h-3" /> {order.customerWhatsapp || '-'}
                     </a>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-white">{order.productTitle}</div>
-                    <div className="text-xs text-cyan-400">R$ {order.productPrice} {order.billingCycle ? '/ ' + (order.billingCycle === 'monthly' ? 'mês' : 'ano') : ''}</div>
+                    <div className="text-white">{order.productTitle || '-'}</div>
+                    <div className="text-xs text-cyan-400">R$ {order.productPrice || 0} {order.billingCycle ? '/ ' + (order.billingCycle === 'monthly' ? 'mês' : 'ano') : ''}</div>
                   </td>
                   <td className="px-6 py-4">
                     {order.isSubscription ? (
@@ -443,7 +448,7 @@ export const AdminDashboard: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 text-xs">
-                     {new Date(order.createdAt).toLocaleDateString()}
+                     {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 text-xs font-bold text-white">
                      {order.isSubscription && order.nextPaymentDate ? (
@@ -455,7 +460,7 @@ export const AdminDashboard: React.FC = () => {
                      )}
                   </td>
                   <td className="px-6 py-4">
-                    <select value={order.status} onChange={(e) => handleUpdateOrderStatus(order, e.target.value as any)} className={`bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-bold ${order.status === 'active' || order.status === 'approved' ? 'text-green-400' : order.status === 'cancelled' ? 'text-red-400' : 'text-yellow-400'}`}>
+                    <select value={order.status || 'pending'} onChange={(e) => handleUpdateOrderStatus(order, e.target.value as any)} className={`bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs font-bold ${(order.status === 'active' || order.status === 'approved') ? 'text-green-400' : order.status === 'cancelled' ? 'text-red-400' : 'text-yellow-400'}`}>
                       <option value="pending">Pendente</option>
                       <option value="active">Ativo (Assinatura)</option>
                       <option value="approved">Aprovado (Venda)</option>

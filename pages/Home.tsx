@@ -137,16 +137,16 @@ export const Home: React.FC = () => {
             </a>
 
             {/* Agentes IA */}
-            <a href="https://agentes.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
-              <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-3xl p-8 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:-translate-y-2 h-full relative overflow-hidden">
+            <a href="https://funcionarios-ia.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
+              <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-3xl p-8 border border-purple-500/30 hover:border-purple-400 transition-all hover:-translate-y-2 h-full relative overflow-hidden">
                 <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">Mais vendido</div>
                 <div className="flex justify-between items-start mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 flex items-center justify-center">
-                    <Smartphone className="w-8 h-8 text-cyan-400" />
+                  <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-3xl">
+                    🤖
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Agente IA WhatsApp</h3>
-                <p className="text-gray-400 mb-6">Assistente inteligente personalizado. Vendedor, suporte, agendamentos e mais!</p>
+                <h3 className="text-2xl font-bold text-white mb-2">Funcionários IA</h3>
+                <p className="text-gray-400 mb-6">Equipe virtual que trabalha 24h. Atendentes, secretárias, vendedores e mais!</p>
                 <div className="mb-4">
                   <span className="text-gray-500 text-sm">A partir de</span>
                   <div className="flex items-baseline gap-2">
@@ -156,19 +156,19 @@ export const Home: React.FC = () => {
                 </div>
                 <div className="space-y-2 mb-6">
                   <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-cyan-400" /> Atendimento 24h automático
+                    <Check className="w-4 h-4 text-purple-400" /> Atendimento 24h automático
                   </div>
                   <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-cyan-400" /> Treinado pro seu negócio
+                    <Check className="w-4 h-4 text-purple-400" /> 7 tipos de funcionários
                   </div>
                   <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-cyan-400" /> Integração WhatsApp
+                    <Check className="w-4 h-4 text-purple-400" /> Treinado pro seu negócio
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-cyan-400 text-sm">3 planos disponíveis</span>
-                  <span className="flex items-center gap-2 text-cyan-400 font-semibold">
-                    Criar meu agente <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span className="text-purple-400 text-sm">A partir de R$ 149/mês</span>
+                  <span className="flex items-center gap-2 text-purple-400 font-semibold">
+                    Ver funcionários <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </div>
               </div>

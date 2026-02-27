@@ -1339,7 +1339,7 @@ function getNextGeminiKey() {
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
 // ElevenLabs para TTS (Text to Speech)
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || 'sk_58c24c18f17f992c34ef06ed15aab001985f7b9b97a30918';
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'IKne3meq5aSn9XLyUdCD'; // Charlie (masculino, português BR)
 
 // WhatsApp do João (responsável pela To-Ligado.com) para encaminhamento de recados
@@ -2829,6 +2829,22 @@ app.post('/api/clients/:id/reconnect', async (req, res) => {
   } else {
     res.status(400).json({ error: 'Requer MySQL' });
   }
+});
+
+// Webhook de notificações do Funcionários IA
+app.post('/api/notifications/webhook', async (req, res) => {
+  const { type, title, message, data, source } = req.body;
+  
+  console.log(`🔔 Notificação [${source}]: ${title} - ${message}`);
+  
+  // Enviar notificação para o WhatsApp do João se for importante
+  const config = await loadConfig();
+  if (config.evolution?.enabled && config.whatsapp && ['new_client', 'new_lead'].includes(type)) {
+    const notifMsg = `🔔 *${title}*\n\n${message}`;
+    await sendEvolutionMessage(config.whatsapp, notifMsg);
+  }
+  
+  res.json({ success: true });
 });
 
 // SPA Fallback

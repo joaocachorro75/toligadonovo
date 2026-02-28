@@ -363,7 +363,7 @@ const INITIAL_DATA = {
     {
       id: '11',
       slug: 'maisquecardapio',
-      title: 'MaisQueCardapio - Cardápio Digital',
+      title: 'Mais que Cardápio - Cardápio Digital',
       menuTitle: 'Cardápio Digital',
       shortDescription: 'Cardápio digital com QR Code, delivery e IA.',
       fullDescription: 'Transforme seu restaurante com cardápio digital via QR Code! Pedidos direto no WhatsApp, gestão de mesas, delivery com taxas por bairro e IA que sugere melhorias no cardápio.',

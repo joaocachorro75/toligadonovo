@@ -205,7 +205,7 @@ export const Home: React.FC = () => {
                     <Star className="w-4 h-4 fill-yellow-400" /> 4.8
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">MaisQueCardapio</h3>
+                <h3 className="text-2xl font-bold text-white mb-2">Mais que Cardápio</h3>
                 <p className="text-gray-400 mb-6">Cardápio digital com QR Code na mesa, delivery integrado e IA que sugere melhorias!</p>
                 <div className="mb-4">
                   <span className="text-gray-500 text-sm">A partir de</span>

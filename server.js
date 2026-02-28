@@ -1338,9 +1338,9 @@ function getNextGeminiKey() {
 // Groq Whisper para transcrição de áudio
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 
-// ElevenLabs para TTS (Text to Speech)
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || 'sk_58c24c18f17f992c34ef06ed15aab001985f7b9b97a30918';
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'IKne3meq5aSn9XLyUdCD'; // Charlie (masculino, português BR)
+// Edge TTS para TTS (Text to Speech) - GRATUITO
+// Ver skill: /home/node/.openclaw/workspace/skills/edge-tts/SKILL.md
+const EDGE_TTS_SCRIPT = '/home/node/.openclaw/workspace/skills/edge-tts/scripts/falar.js';
 
 // WhatsApp do João (responsável pela To-Ligado.com) para encaminhamento de recados
 const JOAO_WHATSAPP = '559131975102';

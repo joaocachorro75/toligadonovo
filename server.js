@@ -2083,6 +2083,108 @@ function extractInterest(text) {
 // Controle de mensagens duplicadas
 const recentMessages = new Map();
 
+// ==========================================
+// WEBHOOK FACEBOOK MESSENGER
+// ==========================================
+
+// Verificação do webhook (Facebook exige esse endpoint GET)
+app.get('/webhook/messenger', (req, res) => {
+  const VERIFY_TOKEN = 'toligado_verify_2026';
+  
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  
+  console.log('🔔 Messenger Webhook Verification:', { mode, token, challenge });
+  
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('✅ Messenger webhook verificado com sucesso!');
+    return res.status(200).send(challenge);
+  }
+  
+  console.log('❌ Falha na verificação do Messenger webhook');
+  return res.sendStatus(403);
+});
+
+// Receber mensagens do Messenger
+app.post('/webhook/messenger', async (req, res) => {
+  try {
+    const body = req.body;
+    
+    console.log('📨 Messenger Webhook recebido:', JSON.stringify(body, null, 2));
+    
+    // Verificar se é uma mensagem de página
+    if (body.object === 'page') {
+      for (const entry of body.entry) {
+        const webhookEvent = entry.messaging[0];
+        
+        if (webhookEvent.message) {
+          const senderId = webhookEvent.sender.id;
+          const messageText = webhookEvent.message.text;
+          const messageId = webhookEvent.message.mid;
+          
+          console.log(`📩 Mensagem do Messenger: ${senderId} -> ${messageText}`);
+          
+          // Evitar duplicatas
+          if (recentMessages.has(messageId)) {
+            console.log('Mensagem duplicada ignorada:', messageId);
+            continue;
+          }
+          recentMessages.set(messageId, true);
+          setTimeout(() => recentMessages.delete(messageId), 10000);
+          
+          // Processar com Ligadinho (mesma lógica do WhatsApp)
+          const resposta = await processarLigadinho(messageText, senderId, 'messenger');
+          
+          // Responder no Messenger
+          if (resposta) {
+            await sendMessengerMessage(senderId, resposta);
+          }
+        }
+      }
+    }
+    
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('❌ Erro no webhook Messenger:', error);
+    res.status(500).send('Error');
+  }
+});
+
+// Função para enviar mensagem no Messenger
+async function sendMessengerMessage(recipientId, text) {
+  const PAGE_ACCESS_TOKEN = 'EAAN0RPM3bS4BQ9MaT1KbzCV3SiEgN7ClDhyFazJapWxmRXVQ3guxgGbdTyxaUZBOYVRS2MZCOCYHC0uFSyEPANqhdSbOJi5FSnOaqRUlEAl9XzG8HYSM5EfXWvm6I6jyOxiSWrubOMUjPLs2chyvKsqwBLZAjrPKm8fkZA4ltVudOvzv4VE03ZArxvnaSdTeX';
+  
+  try {
+    const response = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: { text: text }
+      })
+    });
+    
+    const data = await response.json();
+    console.log('✅ Mensagem enviada no Messenger:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Erro ao enviar mensagem no Messenger:', error);
+    return null;
+  }
+}
+
+// Função auxiliar para processar mensagem do Ligadinho (chamada pelo WhatsApp e Messenger)
+async function processarLigadinho(texto, usuarioId, canal = 'whatsapp') {
+  // TODO: Implementar lógica do Ligadinho
+  // Por ora, retorna uma resposta simples
+  return `Olá! Sou o Ligadinho, atendente da To-Ligado.com! Como posso ajudar?`;
+}
+
+// ==========================================
+// WEBHOOK EVOLUTION API (WHATSAPP)
+// ==========================================
+
 // Webhook da Evolution API
 app.post('/webhook/evolution', async (req, res) => {
   try {

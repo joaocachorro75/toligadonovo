@@ -137,7 +137,7 @@ export const Home: React.FC = () => {
             </a>
 
             {/* Agentes IA */}
-            <a href="https://funcionarios-ia.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
+            <a href="https://funcionariosia.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
               <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-3xl p-8 border border-purple-500/30 hover:border-purple-400 transition-all hover:-translate-y-2 h-full relative overflow-hidden">
                 <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">Mais vendido</div>
                 <div className="flex justify-between items-start mb-6">
@@ -159,7 +159,7 @@ export const Home: React.FC = () => {
                     <Check className="w-4 h-4 text-purple-400" /> Atendimento 24h automático
                   </div>
                   <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-purple-400" /> 7 tipos de funcionários
+                    <Check className="w-4 h-4 text-purple-400" /> 24 tipos de funcionários
                   </div>
                   <div className="flex items-center gap-2 text-gray-300 text-sm">
                     <Check className="w-4 h-4 text-purple-400" /> Treinado pro seu negócio

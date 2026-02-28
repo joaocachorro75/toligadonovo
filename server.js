@@ -2153,7 +2153,7 @@ app.post('/webhook/messenger', async (req, res) => {
 
 // Função para enviar mensagem no Messenger
 async function sendMessengerMessage(recipientId, text) {
-  const PAGE_ACCESS_TOKEN = 'EAAN0RPM3bS4BQ9MaT1KbzCV3SiEgN7ClDhyFazJapWxmRXVQ3guxgGbdTyxaUZBOYVRS2MZCOCYHC0uFSyEPANqhdSbOJi5FSnOaqRUlEAl9XzG8HYSM5EfXWvm6I6jyOxiSWrubOMUjPLs2chyvKsqwBLZAjrPKm8fkZA4ltVudOvzv4VE03ZArxvnaSdTeX';
+  const PAGE_ACCESS_TOKEN = 'EAAN0RPM3bS4BQ86xlPsjXyDApDZB4AvRENULyIuEoydJzAdO9cnQnvEh17KCOnAOzWbruZCKKuAZBqYavn6DVvdL1cpFPP2dTipBGvpBRPpf42Y6vBnl9SgZA4MhcqMuZA5aHtNRHKdLNZAGqumsDlGzMkaxuY5xZCW4xLMOPgIOMCbtGdYyyOzPZAjceGnriPjjzKK8AQOs';
   
   try {
     const response = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {

@@ -359,6 +359,20 @@ const INITIAL_DATA = {
       heroImage: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&q=80&w=2000',
       features: ['Personalizado para seu negócio', 'Atendimento 24h', 'Vendas automáticas', 'Suporte inteligente'],
       ctaText: 'Criar Meu Agente'
+    },
+    {
+      id: '11',
+      slug: 'maisquecardapio',
+      title: 'MaisQueCardapio - Cardápio Digital',
+      menuTitle: 'Cardápio Digital',
+      shortDescription: 'Cardápio digital com QR Code, delivery e IA.',
+      fullDescription: 'Transforme seu restaurante com cardápio digital via QR Code! Pedidos direto no WhatsApp, gestão de mesas, delivery com taxas por bairro e IA que sugere melhorias no cardápio.',
+      price: 49.00,
+      paymentType: 'recurring',
+      billingCycle: 'monthly',
+      heroImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34b4?auto=format&fit=crop&q=80&w=2000',
+      features: ['QR Code nas mesas', 'Delivery integrado', 'IA para sugestões', 'Reservas online'],
+      ctaText: 'Criar Cardápio'
     }
   ],
   posts: [

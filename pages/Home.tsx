@@ -97,7 +97,7 @@ export const Home: React.FC = () => {
             <p className="text-gray-400 text-lg max-w-2xl mx-auto">Comece hoje mesmo! Sem complicação, sem setup, sem dor de cabeça.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {/* PdvCel */}
             <a href="https://pdvcel.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
               <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 rounded-3xl p-8 border border-indigo-500/30 hover:border-indigo-400 transition-all hover:-translate-y-2 h-full">
@@ -188,6 +188,47 @@ export const Home: React.FC = () => {
                   <span className="text-purple-300 text-sm font-medium">24 funcionários disponíveis</span>
                   <span className="flex items-center gap-2 text-white font-bold bg-purple-500 px-4 py-2 rounded-full group-hover:bg-purple-400 transition-colors">
                     Contratar <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                </div>
+              </div>
+            </a>
+
+            {/* MaisQueCardapio - Cardápio Digital */}
+            <a href="https://automacao-maisquecardapio.nfeujb.easypanel.host" target="_blank" rel="noopener noreferrer" className="group">
+              <div className="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-3xl p-8 border border-amber-500/30 hover:border-amber-400 transition-all hover:-translate-y-2 h-full relative overflow-hidden">
+                <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-xs font-bold">Trial 7 dias</div>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/20 flex items-center justify-center text-3xl">
+                    🍽️
+                  </div>
+                  <div className="flex items-center gap-1 text-yellow-400 text-sm">
+                    <Star className="w-4 h-4 fill-yellow-400" /> 4.8
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">MaisQueCardapio</h3>
+                <p className="text-gray-400 mb-6">Cardápio digital com QR Code na mesa, delivery integrado e IA que sugere melhorias!</p>
+                <div className="mb-4">
+                  <span className="text-gray-500 text-sm">A partir de</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-white">R$ 49</span>
+                    <span className="text-gray-500">/mês</span>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-6">
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> QR Code nas mesas
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> Delivery por bairro
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> IA para sugestões
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-amber-400 text-sm">Pedidos no WhatsApp</span>
+                  <span className="flex items-center gap-2 text-amber-400 font-semibold">
+                    Criar cardápio <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </div>
               </div>

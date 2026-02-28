@@ -1149,6 +1149,32 @@ app.post('/api/orders', async (req, res) => {
     }
   }
   
+  // MaisQueCardapio - Cardápio Digital
+  if (order.productSlug === 'maisquecardapio' || order.productSlug === 'cardapio-digital' || order.productTitle?.toLowerCase().includes('cardápio') || order.productTitle?.toLowerCase().includes('cardapio')) {
+    try {
+      const cardapioRes = await fetch('https://automacao-maisquecardapio.nfeujb.easypanel.host/api/sync/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order: order,
+          apiKey: 'toligado_sync_2026'
+        })
+      });
+      if (cardapioRes.ok) {
+        const data = await cardapioRes.json();
+        saasAccount = {
+          type: 'maisquecardapio',
+          url: data.url,
+          login: data.slug,
+          password: data.password,
+          tenantId: data.establishmentId
+        };
+      }
+    } catch (e) {
+      console.error('Erro ao criar conta MaisQueCardapio:', e);
+    }
+  }
+  
   // Notificar admin no WhatsApp
   if (config.evolution?.enabled && config.whatsapp) {
     let msg = `💰 *Nova Venda!*\n\n📦 Produto: ${order.productTitle || 'Não informado'}\n👤 Cliente: ${order.customerName || 'Não informado'}\n📱 WhatsApp: ${order.customerWhatsapp || 'Não informado'}\n💵 Valor: R$ ${order.price ? order.price.toFixed(2) : '0,00'}`;

@@ -136,39 +136,58 @@ export const Home: React.FC = () => {
               </div>
             </a>
 
-            {/* Agentes IA */}
+            {/* Funcionários IA - Card Premium */}
             <a href="https://funcionariosia.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
-              <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-3xl p-8 border border-purple-500/30 hover:border-purple-400 transition-all hover:-translate-y-2 h-full relative overflow-hidden">
-                <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold">Mais vendido</div>
+              <div className="bg-gradient-to-br from-purple-900/60 via-violet-900/50 to-indigo-900/60 rounded-3xl p-8 border-2 border-purple-500/50 hover:border-purple-400 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-purple-500/20 h-full relative overflow-hidden">
+                {/* Efeito de brilho animado */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+
+                {/* Badge */}
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">🔥 MAIS VENDIDO</span>
+                </div>
+
+                {/* Ícone com animação */}
                 <div className="flex justify-between items-start mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center text-3xl">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-3xl shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
                     🤖
                   </div>
+                  <div className="flex items-center gap-1 text-yellow-400 text-sm">
+                    <Star className="w-4 h-4 fill-yellow-400" /> 4.9
+                  </div>
                 </div>
+
                 <h3 className="text-2xl font-bold text-white mb-2">Funcionários IA</h3>
-                <p className="text-gray-400 mb-6">Equipe virtual que trabalha 24h. Atendentes, secretárias, vendedores e mais!</p>
-                <div className="mb-4">
-                  <span className="text-gray-500 text-sm">A partir de</span>
+                <p className="text-gray-300 mb-6 font-medium">Contrate uma equipe virtual que trabalha <span className="text-purple-400 font-bold">24h por dia</span>, sem férias e sem salário!</p>
+
+                {/* Preço com destaque */}
+                <div className="mb-4 bg-purple-500/10 rounded-xl p-4 border border-purple-500/20">
+                  <span className="text-gray-400 text-sm">Começando em</span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold text-white">R$ 199</span>
-                    <span className="text-gray-500">/mês</span>
+                    <span className="text-4xl font-black text-white">R$ 149</span>
+                    <span className="text-gray-400">/mês</span>
                   </div>
+                  <span className="text-xs text-purple-400">Economize até R$ 8.000/mês vs funcionário real</span>
                 </div>
+
+                {/* Features */}
                 <div className="space-y-2 mb-6">
-                  <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-purple-400" /> Atendimento 24h automático
+                  <div className="flex items-center gap-2 text-gray-200 text-sm">
+                    <Check className="w-4 h-4 text-green-400 flex-shrink-0" /> Atendente, vendedor, secretária...
                   </div>
-                  <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-purple-400" /> 24 tipos de funcionários
+                  <div className="flex items-center gap-2 text-gray-200 text-sm">
+                    <Check className="w-4 h-4 text-green-400 flex-shrink-0" /> Integração com WhatsApp
                   </div>
-                  <div className="flex items-center gap-2 text-gray-300 text-sm">
-                    <Check className="w-4 h-4 text-purple-400" /> Treinado pro seu negócio
+                  <div className="flex items-center gap-2 text-gray-200 text-sm">
+                    <Check className="w-4 h-4 text-green-400 flex-shrink-0" /> Treinado pro SEU negócio
                   </div>
                 </div>
+
+                {/* CTA */}
                 <div className="flex items-center justify-between">
-                  <span className="text-purple-400 text-sm">A partir de R$ 149/mês</span>
-                  <span className="flex items-center gap-2 text-purple-400 font-semibold">
-                    Ver funcionários <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span className="text-purple-300 text-sm font-medium">24 funcionários disponíveis</span>
+                  <span className="flex items-center gap-2 text-white font-bold bg-purple-500 px-4 py-2 rounded-full group-hover:bg-purple-400 transition-colors">
+                    Contratar <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </div>
               </div>

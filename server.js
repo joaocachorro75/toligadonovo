@@ -348,17 +348,17 @@ const INITIAL_DATA = {
     },
     {
       id: '10',
-      slug: 'agente-ia-whatsapp',
-      title: 'Agente IA para WhatsApp',
-      menuTitle: 'Agente IA',
-      shortDescription: 'Assistente inteligente personalizado para seu negócio.',
-      fullDescription: 'Crie um agente de IA personalizado para WhatsApp! Pode ser atendente, vendedor, suporte, assistente de imóveis, agendamentos, e muito mais. Configuramos do seu jeito!',
-      price: 199.00,
+      slug: 'funcionarios-ia',
+      title: 'Funcionários IA - Equipe Virtual 24h',
+      menuTitle: 'Funcionários IA',
+      shortDescription: 'Equipe virtual que trabalha 24h: atendentes, vendedores, secretárias e mais!',
+      fullDescription: 'Contrate funcionários de IA que trabalham 24h por dia, sem férias e sem salário! Atendentes, vendedores, secretárias, assistentes de agendamento e muito mais. Todos treinados para o seu negócio e integrados com WhatsApp.',
+      price: 149.00,
       paymentType: 'recurring',
       billingCycle: 'monthly',
       heroImage: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?auto=format&fit=crop&q=80&w=2000',
-      features: ['Personalizado para seu negócio', 'Atendimento 24h', 'Vendas automáticas', 'Suporte inteligente'],
-      ctaText: 'Criar Meu Agente'
+      features: ['24 tipos de funcionários', 'Atendimento 24h', 'Integração WhatsApp', 'Treinado para seu negócio'],
+      ctaText: 'Contratar Funcionários'
     },
     {
       id: '11',

@@ -1122,29 +1122,30 @@ app.post('/api/orders', async (req, res) => {
     }
   }
   
-  // Agentes IA - WhatsApp
-  if (order.productSlug === 'agente-ia-whatsapp' || order.productTitle?.toLowerCase().includes('agente')) {
+  // Funcionários IA - WhatsApp
+  if (order.productSlug === 'agente-ia-whatsapp' || order.productSlug === 'funcionarios-ia' || order.productTitle?.toLowerCase().includes('agente') || order.productTitle?.toLowerCase().includes('funcionário')) {
     try {
-      // Criar cliente no SaaS de Agentes via registro público
-      const agentesRes = await fetch('https://agentes.to-ligado.com/api/auth/register', {
+      // Criar cliente no SaaS Funcionários IA via sync/order (mesmo padrão do PDVCel)
+      const funcionariosRes = await fetch('https://funcionariosia.to-ligado.com/api/sync/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: order.customerName || 'Cliente',
-          whatsapp: order.customerWhatsapp,
-          password: 'mudar123'
+          order: order,
+          apiKey: 'toligado_sync_2026'
         })
       });
-      if (agentesRes.ok) {
+      if (funcionariosRes.ok) {
+        const data = await funcionariosRes.json();
         saasAccount = {
-          type: 'agentes',
-          url: 'https://agentes.to-ligado.com',
+          type: 'funcionarios-ia',
+          url: 'https://funcionariosia.to-ligado.com',
           login: order.customerWhatsapp,
-          password: 'mudar123'
+          password: data.password || 'mudar123',
+          tenantId: data.clientId
         };
       }
     } catch (e) {
-      console.error('Erro ao criar conta Agentes IA:', e);
+      console.error('Erro ao criar conta Funcionários IA:', e);
     }
   }
   

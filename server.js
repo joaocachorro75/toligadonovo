@@ -1358,7 +1358,7 @@ function getNextModalKey() {
   return key;
 }
 
-const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.modal.com/v1';
+const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
 
 // Gemini (apenas para visão, não usado no atendente)
 // Configure GEMINI_API_KEYS no Easypanel com chaves separadas por vírgula

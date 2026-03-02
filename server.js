@@ -1410,7 +1410,12 @@ async function encaminharParaJoao(whatsappCliente, nomeCliente, recado) {
 
 async function transcribeAudio(audioUrl) {
   try {
-    console.log('Transcrevendo áudio...');
+    console.log('Transcrevendo áudio com Groq Whisper...');
+    
+    if (!GROQ_API_KEY) {
+      console.error('GROQ_API_KEY não configurada');
+      return null;
+    }
     
     // Baixar o áudio
     const audioResponse = await fetch(audioUrl);
@@ -1421,15 +1426,16 @@ async function transcribeAudio(audioUrl) {
     
     const audioBuffer = await audioResponse.buffer();
     
-    // Usar ElevenLabs Speech-to-Text (mais preciso)
+    // Usar Groq Whisper (gratuito e rápido)
     const formData = new FormData();
     formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), 'audio.ogg');
-    formData.append('model_id', 'scribe_v1');
+    formData.append('model', 'whisper-large-v3');
+    formData.append('language', 'pt');
     
-    const sttResponse = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+    const sttResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY
+        'Authorization': `Bearer ${GROQ_API_KEY}`
       },
       body: formData
     });
@@ -1437,7 +1443,7 @@ async function transcribeAudio(audioUrl) {
     const data = await sttResponse.json();
     
     if (data.text) {
-      console.log('Áudio transcrito (ElevenLabs):', data.text);
+      console.log('✅ Áudio transcrito:', data.text);
       return data.text;
     }
     
@@ -1486,44 +1492,32 @@ async function transcribeAudioBuffer(audioBuffer) {
   }
 }
 
-// Texto para fala com ElevenLabs
+// Texto para fala com Edge TTS (GRATUITO)
 async function textToSpeech(text) {
   try {
-    if (!ELEVENLABS_API_KEY) {
-      console.error('ElevenLabs API key não configurada');
-      return null;
-    }
-
-    console.log('Gerando áudio com ElevenLabs...');
+    console.log('Gerando áudio com Edge TTS...');
     
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': ELEVENLABS_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        text: text,
-        // Sem model_id = usa padrão da API (funciona em inglês)
-        // NOTA: eleven_multilingual_v2 causa erro no áudio no WhatsApp
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75
-        }
-      })
+    // Usar Edge TTS via script da skill
+    const { execSync } = require('child_process');
+    
+    // Voz masculina pt-BR: Antonio
+    const voice = 'pt-BR-AntonioNeural';
+    
+    // Executar script Edge TTS
+    const result = execSync(`node "${EDGE_TTS_SCRIPT}" "${text.replace(/"/g, '\\"')}" "${voice}"`, {
+      encoding: 'buffer',
+      maxBuffer: 10 * 1024 * 1024 // 10MB
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Erro ElevenLabs:', JSON.stringify(error));
-      return null;
+    
+    if (result && result.length > 0) {
+      console.log('✅ Áudio gerado com Edge TTS:', result.length, 'bytes');
+      return result;
     }
-
-    const audioBuffer = await response.buffer();
-    console.log('Áudio gerado com sucesso!');
-    return audioBuffer;
+    
+    console.error('Erro: Edge TTS retornou buffer vazio');
+    return null;
   } catch (e) {
-    console.error('Erro ao gerar áudio:', e.message);
+    console.error('Erro ao gerar áudio com Edge TTS:', e.message);
     return null;
   }
 }
@@ -2406,9 +2400,9 @@ app.post('/webhook/evolution', async (req, res) => {
     // Enviar resposta
     const config = await loadConfig();
     if (config.evolution?.enabled) {
-      // Se a mensagem original era áudio, responder com áudio
-      if (wasAudio && ELEVENLABS_API_KEY) {
-        console.log('Gerando resposta em áudio com ElevenLabs...');
+      // Se a mensagem original era áudio, responder com áudio (Edge TTS)
+      if (wasAudio) {
+        console.log('Gerando resposta em áudio com Edge TTS...');
         
         // Gerar áudio com ElevenLabs
         const audioBuffer = await textToSpeech(response);
@@ -2504,7 +2498,7 @@ app.get('/api/debug/audio', (req, res) => {
   res.json({ 
     logs: debugLogs.slice(-20),
     groqKey: GROQ_API_KEY ? 'CONFIGURADA' : 'NÃO CONFIGURADA',
-    elevenKey: ELEVENLABS_API_KEY ? 'CONFIGURADA' : 'NÃO CONFIGURADA'
+    edgeTTS: 'CONFIGURADO (gratuito)'
   });
 });
 

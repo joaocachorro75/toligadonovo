@@ -1345,7 +1345,7 @@ app.post('/api/login', async (req, res) => {
 // Configure MODAL_API_KEYS no Easypanel com chaves separadas por vírgula
 // OBRIGATÓRIO: configurar no EasyPanel → Environment Variables
 // Exemplo: MODAL_API_KEYS=chave1,chave2,chave3
-const MODAL_KEYS = (process.env.MODAL_API_KEYS || '')
+const MODAL_KEYS = (process.env.MODAL_API_KEYS || 'modalresearch_KAyt2UOxxSeWP5oLBn8Xyxq-1QWUTtdi07GfRJ2tYCU')
   .split(',')
   .map(k => k.trim())
   .filter(k => k.length > 0);
@@ -1358,7 +1358,7 @@ function getNextModalKey() {
   return key;
 }
 
-const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
+const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://modalresearch--api-gateway.modal.run/v1';
 
 // Gemini (apenas para visão, não usado no atendente)
 // Configure GEMINI_API_KEYS no Easypanel com chaves separadas por vírgula

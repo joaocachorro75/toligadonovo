@@ -233,6 +233,44 @@ export const Home: React.FC = () => {
                 </div>
               </div>
             </a>
+
+            {/* SaaS Sites para Revendas */}
+            <a href="https://revendastvsaas.to-ligado.com" target="_blank" rel="noopener noreferrer" className="group">
+              <div className="bg-gradient-to-br from-slate-900/80 to-gray-900/80 rounded-3xl p-8 border border-slate-600/30 hover:border-slate-500 transition-all hover:-translate-y-2 h-full">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-500/20 flex items-center justify-center text-3xl">
+                    🌐
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-slate-500/20 text-slate-300 text-xs font-bold">Novo</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Sites para Revendas</h3>
+                <p className="text-gray-400 mb-6">Crie seu site de vendas em minutos. Ideal para revendedores de TV, produtos digitais e mais.</p>
+                <div className="mb-4">
+                  <span className="text-gray-500 text-sm">A partir de</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-white">R$ 9,90</span>
+                    <span className="text-gray-500">/mês</span>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-6">
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> Site profissional pronto
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> Domínio personalizado
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 text-sm">
+                    <Check className="w-4 h-4 text-green-400" /> Captura de leads
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-sm">Para revendedores</span>
+                  <span className="flex items-center gap-2 text-slate-300 font-semibold">
+                    Criar site <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                </div>
+              </div>
+            </a>
           </div>
         </div>
       </section>

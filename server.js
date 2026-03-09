@@ -3114,3 +3114,199 @@ app.post('/api/ligadinho/send', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ============================================
+// ENDPOINT DE ANÁLISE DE COMPROVANTE PIX (Groq Vision)
+// ============================================
+// POST /api/ligadinho/analyze-pix - Analisa comprovante PIX
+app.post('/api/ligadinho/analyze-pix', async (req, res) => {
+  try {
+    const { imageUrl, imageBase64 } = req.body;
+    
+    if (!imageUrl && !imageBase64) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'imageUrl ou imageBase64 é obrigatório' 
+      });
+    }
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Groq API Key não configurada' 
+      });
+    }
+
+    console.log('🔍 Analisando comprovante PIX com Groq Vision...');
+
+    // Preparar imagem para Groq
+    const imageContent = imageBase64 
+      ? imageBase64.replace(/^data:image\/\w+;base64,/, '')
+      : null;
+
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Analise este comprovante de pagamento PIX e extraia as informações em formato JSON:
+            
+            Informações necessárias:
+            - nome_pagador: Nome completo de quem pagou
+            - nome_recebedor: Nome de quem recebeu
+            - valor: Valor exato da transação (apenas números e vírgula/ponto)
+            - data_pagamento: Data do pagamento
+            - hora_pagamento: Hora da transação
+            - id_transacao: ID ou código da transação PIX
+            - status: Se parece ser um comprovante válido (sim/nao)
+            - observacoes: Qualquer observação relevante
+            
+            Responda APENAS com o JSON, sem explicações.`
+          },
+          imageContent 
+            ? { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageContent}` } }
+            : { type: 'image_url', image_url: { url: imageUrl } }
+        ]
+      }
+    ];
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-90b-vision-preview',
+        messages: messages,
+        temperature: 0.1,
+        max_tokens: 1024
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Erro Groq Vision:', errorData);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Erro ao analisar imagem', 
+        details: errorData 
+      });
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content || '';
+    
+    console.log('✅ Análise Groq Vision completa');
+    console.log('Resposta:', content.substring(0, 200));
+
+    // Extrair JSON da resposta (Groq pode envolver em ```json)
+    let extractedData;
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        extractedData = JSON.parse(jsonMatch[0]);
+      } else {
+        extractedData = JSON.parse(content);
+      }
+    } catch (e) {
+      // Se não conseguir parsear, retorna o texto
+      extractedData = { 
+        raw_text: content,
+        parse_error: true 
+      };
+    }
+
+    res.json({ 
+      success: true, 
+      data: extractedData,
+      raw_response: content
+    });
+
+  } catch (error) {
+    console.error('Erro na análise PIX:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Endpoint alternativo para receber dados já extraídos (confirmação manual)
+app.post('/api/ligadinho/confirm-pix', async (req, res) => {
+  try {
+    const { 
+      whatsapp_cliente,
+      nome_pagador,
+      valor,
+      data_pagamento,
+      id_transacao,
+      status_confirmacao
+    } = req.body;
+
+    if (!whatsapp_cliente || !valor) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'whatsapp e valor são obrigatórios' 
+      });
+    }
+
+    console.log('✅ Comprovante PIX confirmado:', {
+      cliente: whatsapp_cliente,
+      valor,
+      data: data_pagamento
+    });
+
+    // Salvar no banco para histórico
+    if (useMySQL && mysqlPool) {
+      await mysqlPool.execute(
+        `INSERT INTO ligadinho_memoria (tipo, chave, valor) 
+         VALUES (?, ?, ?) 
+         ON DUPLICATE KEY UPDATE valor = ?`,
+        [
+          'pix_confirmado',
+          `pix_${whatsapp_cliente}_${Date.now()}`,
+          JSON.stringify({
+            whatsapp_cliente,
+            nome_pagador,
+            valor,
+            data_pagamento,
+            id_transacao,
+            status_confirmacao,
+            confirmado_em: new Date().toISOString()
+          }),
+          JSON.stringify({
+            whatsapp_cliente,
+            nome_pagador,
+            valor,
+            data_pagamento,
+            id_transacao,
+            status_confirmacao,
+            confirmado_em: new Date().toISOString()
+          })
+        ]
+      );
+    }
+
+    // Notificar João (se configurado)
+    const config = await loadConfig();
+    if (config.evolution?.enabled && config.whatsapp) {
+      const notifMsg = `💰 *PIX Confirmado!*\n\n👤 Cliente: ${whatsapp_cliente}\n💵 Valor: R$ ${valor}\n📅 Data: ${data_pagamento}\n🏷️ ID: ${id_transacao || 'N/A'}`;
+      await sendEvolutionMessage(config.whatsapp, notifMsg);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'PIX confirmado e registrado' 
+    });
+
+  } catch (error) {
+    console.error('Erro ao confirmar PIX:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});

@@ -3310,3 +3310,169 @@ app.post('/api/ligadinho/confirm-pix', async (req, res) => {
     });
   }
 });
+
+// ============================================
+// SINCRONIZAÇÃO DE MEMÓRIA OPENCLAW ↔ CONTAINER
+// ============================================
+// POST /api/ligadinho/memory/sync - Sincroniza memória do OpenClaw pro BD
+// Recebe memória do Ligadinho (OpenClaw) e salva no MySQL
+app.post('/api/ligadinho/memory/sync', async (req, res) => {
+  try {
+    const { 
+      ligadinho_id,        // ID único do Ligadinho (ex: "ligadinho-whatsapp")
+      memory_data,         // Objeto com todas as memórias do OpenClaw
+      timestamp            // Quando foi gerado
+    } = req.body;
+
+    if (!ligadinho_id || !memory_data) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ligadinho_id e memory_data são obrigatórios' 
+      });
+    }
+
+    console.log(`🔄 Sync recebido de ${ligadinho_id} - ${new Date(timestamp).toISOString()}`);
+
+    const synced = [];
+    const errors = [];
+
+    // Itera sobre todas as memórias recebidas
+    for (const [key, value] of Object.entries(memory_data)) {
+      try {
+        // Cria chave única: ligadinho:cliente:memoria
+        const syncKey = `${ligadinho_id}:${key}`;
+        
+        // Detecta tipo automaticamente baseado no conteúdo
+        let tipo = 'memoria';
+        if (key.includes('cliente') || key.includes('lead')) tipo = 'cliente';
+        else if (key.includes('preco') || key.includes('valor')) tipo = 'preco';
+        else if (key.includes('produto')) tipo = 'produto';
+        else if (key.includes('info')) tipo = 'info';
+        else if (key.includes('conversa')) tipo = 'conversa';
+
+        // Converte valor pra string se for objeto
+        const valorStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+        // Salva/Atualiza no MySQL
+        if (useMySQL && mysqlPool) {
+          await mysqlPool.execute(
+            `INSERT INTO ligadinho_memoria (tipo, chave, valor) 
+             VALUES (?, ?, ?) 
+             ON DUPLICATE KEY UPDATE 
+             valor = ?, 
+             tipo = ?, 
+             atualizado_em = CURRENT_TIMESTAMP`,
+            [tipo, syncKey, valorStr, valorStr, tipo]
+          );
+          synced.push(key);
+        }
+      } catch (e) {
+        errors.push({ key, error: e.message });
+      }
+    }
+
+    // Registra sync no log
+    console.log(`✅ Sync completo: ${synced.length} itens, ${errors.length} erros`);
+
+    res.json({ 
+      success: true, 
+      message: `Sincronizado ${synced.length} memórias`,
+      ligadinho_id,
+      synced,
+      errors: errors.length > 0 ? errors : undefined,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Erro no sync:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// GET /api/ligadinho/memory/sync/:ligadinho_id - Busca memória sincronizada
+// Retorna todas as memórias de um Ligadinho específico
+app.get('/api/ligadinho/memory/sync/:ligadinho_id', async (req, res) => {
+  try {
+    const { ligadinho_id } = req.params;
+    
+    if (!useMySQL || !mysqlPool) {
+      return res.status(503).json({ error: 'MySQL não disponível' });
+    }
+
+    const [memorias] = await mysqlPool.execute(
+      'SELECT * FROM ligadinho_memoria WHERE chave LIKE ? ORDER BY atualizado_em DESC',
+      [`${ligadinho_id}:%`]
+    );
+
+    // Converte pro formato JSON limpo
+    const memoryData = {};
+    memorias.forEach(mem => {
+      const key = mem.chave.replace(`${ligadinho_id}:`, '');
+      try {
+        memoryData[key] = JSON.parse(mem.valor);
+      } catch {
+        memoryData[key] = mem.valor;
+      }
+    });
+
+    res.json({
+      success: true,
+      ligadinho_id,
+      memory: memoryData,
+      count: memorias.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar sync:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// POST /api/ligadinho/memory/sync/trigger - Liga OpenClaw chama pro container
+// Quando Liga OpenClaw quer forçar um sync
+app.post('/api/ligadinho/memory/sync/trigger', async (req, res) => {
+  try {
+    const { ligadinho_id, direction = 'bidirectional' } = req.body;
+    
+    // direction: 'to_container' (OpenClaw → BD) ou 'bidirectional' 
+    
+    console.log(`🔄 Trigger de sync recebido: ${ligadinho_id} | Direção: ${direction}`);
+    
+    // Busca memórias atuais do BD
+    const [memorias] = useMySQL && mysqlPool 
+      ? await mysqlPool.execute(
+          'SELECT chave, valor FROM ligadinho_memoria WHERE chave LIKE ? ORDER BY atualizado_em DESC',
+          [`${ligadinho_id}:%`]
+        )
+      : [[]];
+
+    const response = {
+      success: true,
+      action: 'sync_triggered',
+      ligadinho_id,
+      direction,
+      container_memory_count: memorias.length,
+      instruction: direction === 'bidirectional' 
+        ? 'Lig OpenClaw deve enviar memória via POST /api/ligadinho/memory/sync'
+        : 'Modo unidirecional ativo',
+      next_step: 'Aguardando memória do OpenClaw...',
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('Erro no trigger:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});

@@ -2995,3 +2995,100 @@ app.use((req, res, next) => {
 
 process.on('SIGTERM', () => { saveDB(); process.exit(0); });
 app.listen(PORT, () => console.log(`Server running on port ${PORT} | DB: ${useMySQL ? 'MySQL' : 'JSON'}`));
+
+// ============================================
+// ENDPOINTS DE MEMÓRIA DO LIGADINHO
+// ============================================
+
+// Criar tabela ligadinho_memoria se não existir (MySQL)
+async function initLigadinhoMemoryTable() {
+  if (!useMySQL || !mysqlPool) return;
+  try {
+    const conn = await mysqlPool.getConnection();
+    await conn.query(`CREATE TABLE IF NOT EXISTS ligadinho_memoria (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      tipo VARCHAR(50) NOT NULL,
+      chave VARCHAR(100) NOT NULL UNIQUE,
+      valor TEXT NOT NULL,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_tipo (tipo),
+      INDEX idx_chave (chave)
+    )`);
+    conn.release();
+    console.log('✅ Tabela ligadinho_memoria criada/verificada');
+  } catch (e) {
+    console.error('❌ Erro ao criar tabela ligadinho_memoria:', e.message);
+  }
+}
+initLigadinhoMemoryTable();
+
+// POST /api/ligadinho/memory - Gravar memória
+app.post('/api/ligadinho/memory', async (req, res) => {
+  try {
+    const { tipo, chave, valor } = req.body;
+    if (!tipo || !chave || !valor) {
+      return res.status(400).json({ error: 'tipo, chave e valor são obrigatórios' });
+    }
+    if (useMySQL && mysqlPool) {
+      await mysqlPool.execute(
+        'INSERT INTO ligadinho_memoria (tipo, chave, valor) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valor = ?, tipo = ?',
+        [tipo, chave, valor, valor, tipo]
+      );
+      res.json({ success: true, message: 'Memória gravada', chave });
+    } else {
+      res.status(503).json({ error: 'MySQL não disponível' });
+    }
+  } catch (error) {
+    console.error('Erro ao gravar memória:', error);
+    res.status(500).json({ error: 'Erro ao gravar memória' });
+  }
+});
+
+// GET /api/ligadinho/memory - Ler toda a memória
+app.get('/api/ligadinho/memory', async (req, res) => {
+  try {
+    if (useMySQL && mysqlPool) {
+      const [memorias] = await mysqlPool.execute('SELECT * FROM ligadinho_memoria ORDER BY atualizado_em DESC');
+      res.json({ success: true, memorias, count: memorias.length });
+    } else {
+      res.status(503).json({ error: 'MySQL não disponível' });
+    }
+  } catch (error) {
+    console.error('Erro ao ler memória:', error);
+    res.status(500).json({ error: 'Erro ao ler memória' });
+  }
+});
+
+// GET /api/ligadinho/memory/:chave - Buscar memória específica
+app.get('/api/ligadinho/memory/:chave', async (req, res) => {
+  try {
+    const { chave } = req.params;
+    if (useMySQL && mysqlPool) {
+      const [memorias] = await mysqlPool.execute('SELECT * FROM ligadinho_memoria WHERE chave = ?', [chave]);
+      if (memorias.length === 0) {
+        return res.status(404).json({ success: false, message: 'Memória não encontrada' });
+      }
+      res.json({ success: true, memoria: memorias[0] });
+    } else {
+      res.status(503).json({ error: 'MySQL não disponível' });
+    }
+  } catch (error) {
+    console.error('Erro ao buscar memória:', error);
+    res.status(500).json({ error: 'Erro ao buscar memória' });
+  }
+});
+
+// DELETE /api/ligadinho/memory/:chave - Remover memória
+app.delete('/api/ligadinho/memory/:chave', async (req, res) => {
+  try {
+    const { chave } = req.params;
+    if (useMySQL && mysqlPool) {
+      await mysqlPool.execute('DELETE FROM ligadinho_memoria WHERE chave = ?', [chave]);
+    }
+    res.json({ success: true, message: 'Memória removida' });
+  } catch (error) {
+    console.error('Erro ao remover memória:', error);
+    res.status(500).json({ error: 'Erro ao remover memória' });
+  }
+});

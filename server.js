@@ -3092,3 +3092,25 @@ app.delete('/api/ligadinho/memory/:chave', async (req, res) => {
     res.status(500).json({ error: 'Erro ao remover memória' });
   }
 });
+
+// ENDPOINT PARA LIGADINHO OPENCLAW ENVIAR MENSAGENS
+app.post('/api/ligadinho/send', async (req, res) => {
+  try {
+    const { number, message } = req.body;
+    if (!number || !message) {
+      return res.status(400).json({ success: false, error: 'number e message são obrigatórios' });
+    }
+    console.log(`📤 Ligadinho OpenClaw enviando para ${number}: ${message.substring(0, 50)}...`);
+    const result = await sendEvolutionMessage(number, message);
+    if (result) {
+      console.log('✅ Mensagem enviada com sucesso!');
+      res.json({ success: true, message: 'Mensagem enviada', to: number });
+    } else {
+      console.error('❌ Falha ao enviar mensagem');
+      res.status(500).json({ success: false, error: 'Falha ao enviar mensagem' });
+    }
+  } catch (error) {
+    console.error('Erro no endpoint Ligadinho send:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});

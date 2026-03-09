@@ -3476,3 +3476,52 @@ app.post('/api/ligadinho/memory/sync/trigger', async (req, res) => {
     });
   }
 });
+
+// GET /api/ligadinho/memory/sync - Busca com query parameter (evita conflito SPA)
+app.get('/api/ligadinho/memory/sync', async (req, res) => {
+  try {
+    const { ligadinho_id } = req.query;
+    
+    if (!ligadinho_id) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ligadinho_id query parameter é obrigatório' 
+      });
+    }
+    
+    if (!useMySQL || !mysqlPool) {
+      return res.status(503).json({ error: 'MySQL não disponível' });
+    }
+
+    const [memorias] = await mysqlPool.execute(
+      'SELECT * FROM ligadinho_memoria WHERE chave LIKE ? ORDER BY atualizado_em DESC',
+      [`${ligadinho_id}:%`]
+    );
+
+    // Converte pro formato JSON limpo
+    const memoryData = {};
+    memorias.forEach(mem => {
+      const key = mem.chave.replace(`${ligadinho_id}:`, '');
+      try {
+        memoryData[key] = JSON.parse(mem.valor);
+      } catch {
+        memoryData[key] = mem.valor;
+      }
+    });
+
+    res.json({
+      success: true,
+      ligadinho_id,
+      memory: memoryData,
+      count: memorias.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar sync:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});

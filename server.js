@@ -2590,7 +2590,7 @@ app.post('/webhook/evolution', async (req, res) => {
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  model: 'llama-3.2-90b-vision-preview',
+                  model: 'meta-llama/llama-4-scout-17b-16e-instruct',
                   messages: [
                     {
                       role: 'user',
@@ -3560,7 +3560,7 @@ app.post('/api/ligadinho/analyze-pix', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.2-90b-vision-preview',
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
         messages: messages,
         temperature: 0.1,
         max_tokens: 1024

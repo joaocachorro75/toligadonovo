@@ -2664,27 +2664,32 @@ app.post('/webhook/evolution', async (req, res) => {
                       content: [
                         {
                           type: 'text',
-                          text: `Você é um assistente que analisa imagens enviadas por clientes no WhatsApp. Analise esta imagem e responda em JSON com:
-                          
-1. Se é um comprovante PIX/pagamento:
-   - tipo: "comprovante_pix"
-   - nome_pagador, nome_recebedor, valor, data, id_transacao, valido (sim/nao)
+                          text: `Você é um especialista em ler comprovantes PIX. Analise esta imagem com ATENÇÃO TOTAL aos detalhes.
 
-2. Se é uma captura de tela de erro/problema:
-   - tipo: "erro_tela"
-   - descricao: descreva o erro visível
-   - sugestao: o que pode estar causando
+IMPORTANTE: Leia TODOS os dados visíveis no comprovante. Não invente informações, apenas leia o que está na imagem.
 
-3. Se é uma foto de produto/interesse:
-   - tipo: "foto_produto"
-   - descricao: o que aparece na foto
-   - interesse_possivel: qual produto da To-Ligado pode interessar
+Retorne JSON com:
+{
+  "tipo": "comprovante_pix",
+  "nome_pagador": "Nome completo de quem ENVIOU o PIX (campo 'Pagador' ou 'De:')",
+  "nome_recebedor": "Nome de quem RECEBEU (campo 'Recebedor' ou 'Para:')", 
+  "valor": "Valor ex: 35.00 (apenas números, sem R$)",
+  "data": "Data ex: 18/03/2026",
+  "hora": "Hora ex: 14:30",
+  "id_transacao": "Código da transação (campo 'ID', 'Código' ou 'EndToEndId')",
+  "instituicao_pagador": "Banco do pagador se visível",
+  "instituicao_recebedor": "Banco do recebedor se visível",
+  "valido": "sim ou nao",
+  "confianca": "alta, media ou baixa",
+  "observacoes": "Qualquer detalhe relevante"
+}
 
-4. Se é outro tipo de imagem:
-   - tipo: "outra"
-   - descricao: descreva brevemente
+Se NÃO for comprovante PIX:
+- Se for erro/tela: {"tipo": "erro_tela", "descricao": "...", "sugestao": "..."}
+- Se for foto produto: {"tipo": "foto_produto", "descricao": "..."}
+- Se for outra coisa: {"tipo": "outra", "descricao": "..."}
 
-Responda APENAS com o JSON, sem explicações.`
+Responda APENAS com o JSON válido.`
                         },
                         {
                           type: 'image_url',
@@ -2702,19 +2707,36 @@ Responda APENAS com o JSON, sem explicações.`
                 const visionData = await visionResponse.json();
                 const visionContent = visionData.choices[0]?.message?.content || '';
                 
+                console.log('👁️ Vision resposta:', visionContent.substring(0, 300));
+                
                 try {
                   const jsonMatch = visionContent.match(/\{[\s\S]*\}/);
                   if (jsonMatch) {
                     imageContext = JSON.parse(jsonMatch[0]);
-                    console.log('✅ Imagem analisada:', imageContext.tipo);
+                    console.log('✅ Imagem analisada:', imageContext.tipo, '- Confiança:', imageContext.confianca || 'n/a');
                     
-                    // Adicionar contexto ao texto
+                    // Adicionar contexto DETALHADO ao texto
                     if (imageContext.tipo === 'comprovante_pix') {
-                      text = `[IMAGEM: Comprovante PIX de R$ ${imageContext.valor || '?'} - De: ${imageContext.nome_pagador || 'Não identificado'}] ${text || ''}`;
+                      // Criar contexto completo do comprovante
+                      let comprovanteInfo = `[COMPROVANTE PIX DETECTADO]\n`;
+                      comprovanteInfo += `📊 DADOS EXTRAÍDOS:\n`;
+                      if (imageContext.nome_pagador) comprovanteInfo += `• Pagador: ${imageContext.nome_pagador}\n`;
+                      if (imageContext.nome_recebedor) comprovanteInfo += `• Recebedor: ${imageContext.nome_recebedor}\n`;
+                      if (imageContext.valor) comprovanteInfo += `• Valor: R$ ${imageContext.valor}\n`;
+                      if (imageContext.data) comprovanteInfo += `• Data: ${imageContext.data}\n`;
+                      if (imageContext.hora) comprovanteInfo += `• Hora: ${imageContext.hora}\n`;
+                      if (imageContext.id_transacao) comprovanteInfo += `• ID Transação: ${imageContext.id_transacao}\n`;
+                      if (imageContext.instituicao_pagador) comprovanteInfo += `• Banco Pagador: ${imageContext.instituicao_pagador}\n`;
+                      if (imageContext.instituicao_recebedor) comprovanteInfo += `• Banco Recebedor: ${imageContext.instituicao_recebedor}\n`;
+                      comprovanteInfo += `• Válido: ${imageContext.valido || 'verificar'}\n`;
+                      comprovanteInfo += `• Confiança: ${imageContext.confianca || 'média'}\n`;
+                      if (imageContext.observacoes) comprovanteInfo += `• Obs: ${imageContext.observacoes}\n`;
+                      
+                      text = comprovanteInfo + (text ? `\nMensagem do cliente: ${text}` : '');
                     } else if (imageContext.tipo === 'erro_tela') {
-                      text = `[IMAGEM: Captura de tela com erro - ${imageContext.descricao || 'Erro não identificado'}] ${text || ''}`;
+                      text = `[ERRO NA TELA: ${imageContext.descricao || 'Erro não identificado'}]\nSugestão: ${imageContext.sugestao || ''} ${text || ''}`;
                     } else if (imageContext.tipo === 'foto_produto') {
-                      text = `[IMAGEM: ${imageContext.descricao || 'Foto de produto'}] ${text || ''}`;
+                      text = `[FOTO DE PRODUTO: ${imageContext.descricao || 'Produto não identificado'}] ${text || ''}`;
                     } else {
                       text = `[IMAGEM: ${imageContext.descricao || 'Imagem enviada'}] ${text || ''}`;
                     }
@@ -2723,12 +2745,20 @@ Responda APENAS com o JSON, sem explicações.`
                   console.error('Erro ao parsear resposta Vision:', e);
                   text = '[IMAGEM: O cliente enviou uma imagem] ' + (text || '');
                 }
+              } else {
+                const errorText = await visionResponse.text();
+                console.error('❌ Erro Vision:', visionResponse.status, errorText.substring(0, 200));
               }
+            } else {
+              console.error('❌ GROQ_API_KEY não configurada');
             }
           }
+        } else {
+          const errorText = await mediaResponse.text();
+          console.error('❌ Erro ao obter mídia:', mediaResponse.status, errorText.substring(0, 200));
         }
       } catch (e) {
-        console.error('Erro ao processar imagem:', e.message);
+        console.error('❌ Erro ao processar imagem:', e.message);
         text = '[IMAGEM: O cliente enviou uma imagem] ' + (text || '');
       }
     }

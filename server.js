@@ -1724,15 +1724,16 @@ Analise a mensagem e identifique:
 
 ---
 
-## 📸 PROCESSAMENTO DE IMAGENS (VISION)
+## 📸 PROCESSAMENTO DE IMAGENS E PDFs (VISION)
 
-Quando o cliente enviar uma imagem, você receberá o contexto da análise automática:
+Quando o cliente enviar uma imagem ou PDF, você receberá o contexto da análise automática:
 
-### Se for COMPROVANTE PIX:
+### Se for COMPROVANTE PIX (imagem ou PDF):
 - **VALIDAR:** Confira se valor, nome do recebedor e data batem
 - **CONFIRMAR:** "Recebi seu comprovante! Deixa eu verificar..."
 - **PROCESSAR:** Se válido, confirmar pagamento e liberar serviço
 - **DUVIDA:** Se algo estranho, pedir confirmação ou encaminhar pro João
+- **PDF:** Se vier em PDF, pedir para o cliente confirmar os dados principais (valor, data, nome)
 
 ### Se for TELA DE ERRO:
 - **ANALISAR:** Entenda o problema pela descrição
@@ -2550,8 +2551,74 @@ app.post('/webhook/evolution', async (req, res) => {
     // ============================================
     let imageContext = null;
     let wasImage = false;
+    let wasPdf = false;
     
-    if (message?.imageMessage || messageType === 'imageMessage') {
+    // ============================================
+    // PROCESSAMENTO DE PDF (Comprovantes PIX)
+    // ============================================
+    if (message?.documentMessage || messageType === 'documentMessage') {
+      const docMessage = message?.documentMessage || message;
+      const fileName = docMessage?.fileName || docMessage?.title || 'documento.pdf';
+      const mimeType = docMessage?.mimetype || docMessage?.mediaType || '';
+      
+      console.log(`📄 PDF recebido de ${whatsapp}: ${fileName} (${mimeType})`);
+      
+      // Verificar se é PDF
+      if (mimeType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) {
+        wasPdf = true;
+        const config = await loadConfig();
+        
+        try {
+          const msgKey = data.data?.key;
+          const msgMessage = data.data?.message;
+          
+          // Obter PDF da Evolution API
+          const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/getBase64FromMediaMessage/${config.evolution.instanceName}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': config.evolution.apiKey
+            },
+            body: JSON.stringify({
+              message: {
+                key: msgKey,
+                message: msgMessage
+              }
+            })
+          });
+          
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            const base64Pdf = mediaData.base64 || mediaData.media;
+            
+            if (base64Pdf) {
+              console.log('✅ PDF extraído, processando com IA...');
+              
+              // Extrair texto do PDF usando Groq com o arquivo
+              const groqKey = process.env.GROQ_API_KEY;
+              if (groqKey) {
+                // Usar Groq Vision com PDF convertido para texto
+                // Por enquanto, vamos informar que é um PDF e deixar a IA perguntar
+                imageContext = {
+                  tipo: 'comprovante_pdf',
+                  arquivo: fileName,
+                  descricao: 'Comprovante em PDF enviado pelo cliente'
+                };
+                
+                text = `[PDF: Comprovante PIX - ${fileName}] O cliente enviou um comprovante de pagamento em PDF. Por favor, verifique os dados do pagamento.`;
+                console.log('📄 PDF processado, contexto adicionado à conversa');
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Erro ao processar PDF:', e.message);
+          text = '[PDF: O cliente enviou um documento PDF]';
+        }
+      }
+    }
+    
+    // Processar imagem (se não for PDF)
+    if (!wasPdf && (message?.imageMessage || messageType === 'imageMessage')) {
       wasImage = true;
       const config = await loadConfig();
       console.log(`🖼️ Imagem recebida de ${whatsapp}, analisando com Vision...`);

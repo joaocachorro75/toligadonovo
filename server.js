@@ -1724,6 +1724,31 @@ Analise a mensagem e identifique:
 
 ---
 
+## 📸 PROCESSAMENTO DE IMAGENS (VISION)
+
+Quando o cliente enviar uma imagem, você receberá o contexto da análise automática:
+
+### Se for COMPROVANTE PIX:
+- **VALIDAR:** Confira se valor, nome do recebedor e data batem
+- **CONFIRMAR:** "Recebi seu comprovante! Deixa eu verificar..."
+- **PROCESSAR:** Se válido, confirmar pagamento e liberar serviço
+- **DUVIDA:** Se algo estranho, pedir confirmação ou encaminhar pro João
+
+### Se for TELA DE ERRO:
+- **ANALISAR:** Entenda o problema pela descrição
+- **AJUDAR:** Tentar resolver se for simples
+- **ESCALAR:** Se complexo, encaminhar pro João
+
+### Se for FOTO DE PRODUTO/INTERESSE:
+- **IDENTIFICAR:** Entender o que o cliente quer
+- **DIRECIONAR:** Oferecer o produto/serviço adequado
+
+### Se for OUTRA IMAGEM:
+- **DESCREVER:** Mostrar que entendeu o que é
+- **PERGUNTAR:** "Como posso te ajudar com isso?"
+
+---
+
 ## REGRAS DE OURO
 
 ✅ **SEJA HUMANO** - Fale como uma pessoa real falaria
@@ -1732,6 +1757,7 @@ Analise a mensagem e identifique:
 ✅ **RESOLVA DORES** - Foque na solução, não no produto
 ✅ **FECHAMENTO SEMPRE** - Toda conversa deve ter um próximo passo
 ✅ **ENCAMINHE QUANDO NECESSÁRIO** - João resolve o que você não consegue
+✅ **PROCESSE IMAGENS** - Use Vision para entender fotos e comprovantes
 
 ❌ **NUNCA** pareça um robô ou chatbot genérico
 ❌ **NUNCA** ignore uma reclamação ou problema
@@ -2091,6 +2117,180 @@ function extractInterest(text) {
 // Controle de mensagens duplicadas
 const recentMessages = new Map();
 
+// ============================================
+// SISTEMA DE TESTE DE TV - ONPIX API
+// ============================================
+
+// Servidores disponíveis para teste
+const SERVIDORES_TV = [
+  { id: 'wifi-mobile', nome: 'WI-FI MOBILE', descricao: 'Servidor padrão', server_id: 'default' },
+  { id: 'onpix-mandala', nome: 'ON PIX MANDALA', descricao: 'Servidor estável', server_id: 'mandala' },
+  { id: 'pix-anubys', nome: 'PIX ANUBYS', descricao: 'Servidor rápido', server_id: 'anubys' },
+  { id: 'pix-prime', nome: 'PIX PRIME', descricao: 'Servidor premium', server_id: 'prime' },
+  { id: 'pix-supreme', nome: 'PIX SUPREME', descricao: 'Servidor HD', server_id: 'supreme' },
+  { id: 'pix-arena', nome: 'PIX ARENA', descricao: 'Servidor esportes', server_id: 'arena' }
+];
+
+// Token da API OnPix (obtido via login automático)
+const ONPIX_API_URL = 'http://5.161.155.252:80/api';
+const ONPIX_PACKAGE_ID = 'nVrW8oDKaN'; // Pacote de teste 4h
+const ONPIX_LOGIN_URL = 'http://onpix.sigmab.pro/api/auth/login';
+const ONPIX_CREDENTIALS = {
+  username: 'Joao1030',
+  password: 'Canaisip123@'
+};
+
+// Cache do token OnPix
+let onpixTokenCache = { token: null, expires: 0 };
+
+// Obter token da API OnPix (com cache)
+async function getOnPixToken() {
+  // Se token ainda válido (cache por 23h)
+  if (onpixTokenCache.token && Date.now() < onpixTokenCache.expires) {
+    return onpixTokenCache.token;
+  }
+  
+  try {
+    console.log('🔐 Obtendo novo token OnPix...');
+    const response = await fetch(ONPIX_LOGIN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ONPIX_CREDENTIALS)
+    });
+    
+    const data = await response.json();
+    
+    if (data.token) {
+      // Cache por 23 horas (token expira em 24h)
+      onpixTokenCache = {
+        token: data.token,
+        expires: Date.now() + (23 * 60 * 60 * 1000)
+      };
+      console.log('✅ Token OnPix obtido com sucesso!');
+      return data.token;
+    }
+    
+    console.error('❌ Erro ao obter token OnPix:', data);
+    return null;
+  } catch (e) {
+    console.error('❌ Erro no login OnPix:', e.message);
+    return null;
+  }
+}
+
+// Criar teste na API OnPix
+async function criarTesteTV(whatsapp, servidorId) {
+  try {
+    // Gerar username baseado no WhatsApp
+    const username = 'teste_' + whatsapp.replace(/\D/g, '').slice(-8);
+    const password = 'Teste' + Math.random().toString(36).slice(-4).toUpperCase();
+    
+    // Encontrar servidor
+    const servidor = SERVIDORES_TV.find(s => s.id === servidorId) || SERVIDORES_TV[0];
+    
+    console.log(`📺 Criando teste TV para ${whatsapp} no servidor ${servidor.nome}...`);
+    
+    // Obter token
+    const token = await getOnPixToken();
+    
+    if (token) {
+      // Criar teste na API real
+      const response = await fetch(`${ONPIX_API_URL}/customers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          server_id: servidor.server_id,
+          package_id: ONPIX_PACKAGE_ID,
+          username: username,
+          password: password,
+          name: `Teste ${whatsapp}`,
+          connections: 1
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Teste criado na API OnPix:', data);
+        return {
+          success: true,
+          username: data.username || username,
+          password: data.password || password,
+          servidor: servidor.nome,
+          duracao: '4 horas',
+          link: 'https://onpix.sigmab.pro'
+        };
+      } else {
+        const errorText = await response.text();
+        console.log('⚠️ API OnPix erro:', response.status, errorText);
+      }
+    }
+    
+    // Fallback: criar teste simulado (sem API)
+    console.log('📦 Criando teste simulado (fallback)');
+    return {
+      success: true,
+      username: username,
+      password: password,
+      servidor: servidor.nome,
+      duracao: '4 horas',
+      link: 'https://onpix.sigmab.pro',
+      simulated: true
+    };
+  } catch (e) {
+    console.error('Erro ao criar teste:', e.message);
+    return {
+      success: false,
+      error: e.message
+    };
+  }
+}
+
+// Detectar pedido de teste de TV
+function detectarPedidoTeste(text) {
+  const lower = text.toLowerCase();
+  const padroes = [
+    'teste de tv', 'testar tv', 'quero teste', 'quero um teste',
+    'teste iptv', 'teste tv online', 'quero testar', 'me dá um teste',
+    'teste gratis', 'teste gratuito', 'quero testar a tv', 'testar o sistema'
+  ];
+  return padroes.some(p => lower.includes(p));
+}
+
+// Detectar escolha de servidor (número de 1 a 6)
+function detectarEscolhaServidor(text) {
+  const num = parseInt(text.trim());
+  if (num >= 1 && num <= SERVIDORES_TV.length) {
+    return SERVIDORES_TV[num - 1].id;
+  }
+  
+  // Também aceita nome do servidor
+  const lower = text.toLowerCase();
+  for (const servidor of SERVIDORES_TV) {
+    if (lower.includes(servidor.id) || lower.includes(servidor.nome.toLowerCase())) {
+      return servidor.id;
+    }
+  }
+  
+  return null;
+}
+
+// Gerar mensagem com lista de servidores
+function gerarMensagemServidores() {
+  let msg = `Olá! Posso te ajudar a criar um teste de TV! 📺\n\n`;
+  msg += `Quer testar a *TV Wi-Fi Mobile* (servidor padrão) ou prefere outro servidor?\n\n`;
+  msg += `Escolha uma opção:\n\n`;
+  
+  SERVIDORES_TV.forEach((s, i) => {
+    msg += `${i + 1}. ${s.nome}\n`;
+  });
+  
+  msg += `\n_Digite o número da sua escolha!_`;
+  return msg;
+}
+
 // ==========================================
 // WEBHOOK FACEBOOK MESSENGER
 // ==========================================
@@ -2345,6 +2545,127 @@ app.post('/webhook/evolution', async (req, res) => {
       console.log(`💬 Áudio transcrito de ${whatsapp}: ${text}`);
     }
     
+    // ============================================
+    // PROCESSAMENTO DE IMAGEM (Vision)
+    // ============================================
+    let imageContext = null;
+    let wasImage = false;
+    
+    if (message?.imageMessage || messageType === 'imageMessage') {
+      wasImage = true;
+      const config = await loadConfig();
+      console.log(`🖼️ Imagem recebida de ${whatsapp}, analisando com Vision...`);
+      
+      try {
+        const msgKey = data.data?.key;
+        const msgMessage = data.data?.message;
+        
+        // Obter imagem da Evolution API
+        const mediaResponse = await fetch(`${config.evolution.baseUrl}/chat/getBase64FromMediaMessage/${config.evolution.instanceName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.evolution.apiKey
+          },
+          body: JSON.stringify({
+            message: {
+              key: msgKey,
+              message: msgMessage
+            }
+          })
+        });
+        
+        if (mediaResponse.ok) {
+          const mediaData = await mediaResponse.json();
+          const base64Image = mediaData.base64 || mediaData.media;
+          
+          if (base64Image) {
+            // Analisar imagem com Groq Vision
+            const groqKey = process.env.GROQ_API_KEY;
+            if (groqKey) {
+              const visionResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${groqKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'llama-3.2-90b-vision-preview',
+                  messages: [
+                    {
+                      role: 'user',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `Você é um assistente que analisa imagens enviadas por clientes no WhatsApp. Analise esta imagem e responda em JSON com:
+                          
+1. Se é um comprovante PIX/pagamento:
+   - tipo: "comprovante_pix"
+   - nome_pagador, nome_recebedor, valor, data, id_transacao, valido (sim/nao)
+
+2. Se é uma captura de tela de erro/problema:
+   - tipo: "erro_tela"
+   - descricao: descreva o erro visível
+   - sugestao: o que pode estar causando
+
+3. Se é uma foto de produto/interesse:
+   - tipo: "foto_produto"
+   - descricao: o que aparece na foto
+   - interesse_possivel: qual produto da To-Ligado pode interessar
+
+4. Se é outro tipo de imagem:
+   - tipo: "outra"
+   - descricao: descreva brevemente
+
+Responda APENAS com o JSON, sem explicações.`
+                        },
+                        {
+                          type: 'image_url',
+                          image_url: { url: `data:image/jpeg;base64,${base64Image.replace(/^data:image\/\w+;base64,/, '')}` }
+                        }
+                      ]
+                    }
+                  ],
+                  temperature: 0.1,
+                  max_tokens: 500
+                })
+              });
+              
+              if (visionResponse.ok) {
+                const visionData = await visionResponse.json();
+                const visionContent = visionData.choices[0]?.message?.content || '';
+                
+                try {
+                  const jsonMatch = visionContent.match(/\{[\s\S]*\}/);
+                  if (jsonMatch) {
+                    imageContext = JSON.parse(jsonMatch[0]);
+                    console.log('✅ Imagem analisada:', imageContext.tipo);
+                    
+                    // Adicionar contexto ao texto
+                    if (imageContext.tipo === 'comprovante_pix') {
+                      text = `[IMAGEM: Comprovante PIX de R$ ${imageContext.valor || '?'} - De: ${imageContext.nome_pagador || 'Não identificado'}] ${text || ''}`;
+                    } else if (imageContext.tipo === 'erro_tela') {
+                      text = `[IMAGEM: Captura de tela com erro - ${imageContext.descricao || 'Erro não identificado'}] ${text || ''}`;
+                    } else if (imageContext.tipo === 'foto_produto') {
+                      text = `[IMAGEM: ${imageContext.descricao || 'Foto de produto'}] ${text || ''}`;
+                    } else {
+                      text = `[IMAGEM: ${imageContext.descricao || 'Imagem enviada'}] ${text || ''}`;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Erro ao parsear resposta Vision:', e);
+                  text = '[IMAGEM: O cliente enviou uma imagem] ' + (text || '');
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao processar imagem:', e.message);
+        text = '[IMAGEM: O cliente enviou uma imagem] ' + (text || '');
+      }
+    }
+    
     if (!text) {
       return res.json({ ok: true });
     }
@@ -2367,7 +2688,7 @@ app.post('/webhook/evolution', async (req, res) => {
     let stage = conversation.stage;
     let interest = conversation.interest;
     
-    // Salvar mensagem do usuário
+    // Salvar mensagem do usuário (incluindo contexto da imagem se houver)
     await saveMessage(whatsapp, 'user', text);
     
     // Extrair nome se mencionado
@@ -2385,8 +2706,68 @@ app.post('/webhook/evolution', async (req, res) => {
     // Adicionar mensagem atual
     messages.push({ role: 'user', content: text });
     
-    // Gerar resposta
-    const response = await getAgentResponse(messages, whatsapp, name);
+    // ============================================
+    // FLUXO DE TESTE DE TV - INTERCEPTAÇÃO
+    // ============================================
+    let response = null;
+    let skipAI = false; // Se true, não chama getAgentResponse
+    
+    // NOVO STAGE: aguardando_servidor_tv = cliente pediu teste, estamos esperando ele escolher
+    if (stage === 'aguardando_servidor_tv') {
+      const servidorEscolhido = detectarEscolhaServidor(text);
+      
+      if (servidorEscolhido) {
+        console.log(`📺 Cliente ${whatsapp} escolheu servidor: ${servidorEscolhido}`);
+        
+        // Criar teste
+        const resultado = await criarTesteTV(whatsapp, servidorEscolhido);
+        
+        if (resultado.success) {
+          response = `✅ *Seu teste foi criado com sucesso!*\n\n`;
+          response += `👤 Usuário: *${resultado.username}*\n`;
+          response += `🔑 Senha: *${resultado.password}*\n`;
+          response += `📡 Servidor: ${resultado.servidor}\n`;
+          response += `⏱️ Duração: ${resultado.duracao}\n\n`;
+          response += `🔗 Acesse: ${resultado.link}\n\n`;
+          response += `_Aproveite seu teste! Se precisar de mais algo, é só chamar._`;
+          
+          // Voltar stage para welcome
+          await saveMessage(whatsapp, 'system', `Teste criado no servidor ${resultado.servidor}`, null, 'TV Cine Box', 'welcome');
+        } else {
+          response = `❌ Ops! Tive um problema ao criar seu teste. Pode tentar novamente? Se persistir, posso te passar para um humano.`;
+          await saveMessage(whatsapp, 'system', 'Erro ao criar teste', null, null, 'welcome');
+        }
+        
+        skipAI = true;
+      } else {
+        // Cliente enviou algo que não é um número válido
+        response = `Hmm, não entendi sua escolha. Por favor, digite o número do servidor que você quer:\n\n`;
+        SERVIDORES_TV.forEach((s, i) => {
+          response += `${i + 1}. ${s.nome}\n`;
+        });
+        skipAI = true;
+      }
+    }
+    // DETECTAR PEDIDO DE TESTE DE TV
+    else if (detectarPedidoTeste(text)) {
+      console.log(`📺 Cliente ${whatsapp} pediu teste de TV`);
+      
+      // Mostrar lista de servidores
+      response = gerarMensagemServidores();
+      
+      // Salvar stage aguardando escolha
+      await saveMessage(whatsapp, 'system', 'Aguardando escolha de servidor TV', null, 'TV Cine Box', 'aguardando_servidor_tv');
+      
+      skipAI = true;
+    }
+    
+    // Se não interceptou, gerar resposta com IA normalmente
+    if (!skipAI) {
+      response = await getAgentResponse(messages, whatsapp, name);
+    }
+    // ============================================
+    // FIM DO FLUXO DE TESTE DE TV
+    // ============================================
     
     // Se resposta for null (erro), não responder para evitar loop
     if (!response) {

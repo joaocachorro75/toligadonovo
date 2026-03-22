@@ -1384,7 +1384,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const EDGE_TTS_SCRIPT = '/home/node/.openclaw/workspace/skills/edge-tts/scripts/falar.js';
 
 // WhatsApp do João (responsável pela To-Ligado.com) para encaminhamento de recados
-const JOAO_WHATSAPP = '559131975102';
+const JOAO_WHATSAPP = '5591980124904';
 
 // Função para encaminhar recado para o João
 async function encaminharParaJoao(whatsappCliente, nomeCliente, recado) {
@@ -1692,7 +1692,7 @@ Analise a mensagem e identifique:
 1. "Entendi! Você quer falar com o João. Deixa eu pegar seu recado."
 2. Pergunte: "Qual seu nome e qual o assunto?"
 3. Diga: "Vou passar pra ele agora e ele te retorna em breve."
-4. **ENCAMINHAR automaticamente** - você deve indicar no sistema que precisa enviar mensagem para o número **559131975102**
+4. **ENCAMINHAR automaticamente** - você deve indicar no sistema que precisa enviar mensagem para o número **5591980124904**
 
 ### Quando NÃO encaminhar:
 - Se a pessoa se chama João ou Junior mas está perguntando sobre produtos
@@ -1771,7 +1771,7 @@ Quando o cliente enviar uma imagem ou PDF, você receberá o contexto da anális
 
 - **Site:** https://to-ligado.com
 - **Responsável:** João (também chamado de Junior)
-- **WhatsApp do João:** 559131975102 (para encaminhar recados)
+- **WhatsApp do João:** 5591980124904 (para encaminhar recados)
 - **Seu papel:** Atendimento + Vendas + Suporte
 - **Seu diferencial:** Conhecimento profundo + Humanização
 

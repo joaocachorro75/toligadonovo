@@ -1914,7 +1914,7 @@ async function saveMessage(whatsapp, role, content, name = null, interest = null
   }
 }
 
-// Função principal - usa Modal GLM-5 com rotação de chaves
+// Função principal - Groq como principal, Modal (Nvidia Qwen) como fallback
 async function getAgentResponse(messages, whatsapp, name) {
   // Construir contexto com preços dinâmicos do banco
   let contextPrompt = await getAgentSystemPrompt();
@@ -1932,8 +1932,39 @@ async function getAgentResponse(messages, whatsapp, name) {
       }))
     ];
     
+    // PRINCIPAL: Usar Groq
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey) {
+      console.log(`⚡ Usando Groq Llama 3.3 70B (principal)...`);
+      
+      try {
+        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${groqKey}`
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: formattedMessages,
+            temperature: 0.9,
+            max_tokens: 500
+          })
+        });
+        
+        const groqData = await groqResponse.json();
+        if (groqData.choices?.[0]?.message?.content) {
+          console.log('✅ Groq respondeu!');
+          return groqData.choices[0].message.content;
+        }
+      } catch (e) {
+        console.error('Groq falhou:', e.message);
+      }
+    }
+    
+    // FALLBACK: Usar Modal (Nvidia Qwen) se Groq falhar
     const apiKey = getNextModalKey();
-    console.log(`Chamando Modal GLM-5 (chave ${modalKeyIndex}/${MODAL_KEYS.length})...`);
+    console.log(`🎮 Groq falhou - usando Modal Nvidia Qwen 3.5 397B (fallback)...`);
     
     const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -1942,7 +1973,7 @@ async function getAgentResponse(messages, whatsapp, name) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'zai-org/GLM-5-FP8',
+        model: 'qwen/qwen3.5-397b-a17b',
         messages: formattedMessages,
         temperature: 0.9,
         max_tokens: 500
@@ -1951,49 +1982,15 @@ async function getAgentResponse(messages, whatsapp, name) {
     
     const data = await response.json();
     
-    // GLM-5 pode retornar content ou reasoning_content
+    // Qwen pode retornar content ou reasoning_content
     const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
     
     if (responseText) {
-      console.log('✅ Modal GLM-5 respondeu!');
+      console.log('✅ Nvidia Qwen respondeu!');
       return responseText;
     }
     
-    console.error('Modal falhou:', JSON.stringify(data).substring(0, 200));
-    
-    // FALLBACK: Usar Groq se Modal falhar
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-      console.error('GROQ_API_KEY não configurada');
-      return null;
-    }
-    
-    console.log('⚠️ Modal falhou - usando Groq...');
-    
-    try {
-      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${groqKey}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: formattedMessages,
-          temperature: 0.9,
-          max_tokens: 500
-        })
-      });
-      
-      const groqData = await groqResponse.json();
-      if (groqData.choices?.[0]?.message?.content) {
-        console.log('✅ Groq respondeu!');
-        return groqData.choices[0].message.content;
-      }
-    } catch (e) {
-      console.error('Groq também falhou:', e.message);
-    }
-    
+    console.error('Modal também falhou:', JSON.stringify(data).substring(0, 200));
     return null;
   } catch (e) {
     console.error('Erro no agente:', e.message);

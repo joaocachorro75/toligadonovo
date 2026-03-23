@@ -1358,6 +1358,22 @@ function getNextModalKey() {
   return key;
 }
 
+// Nvidia API - múltiplas chaves com rotação
+// Configure NVIDIA_API_KEY no Easypanel com chaves separadas por vírgula
+const NVIDIA_KEYS = (process.env.NVIDIA_API_KEY || process.env.NVIDIA_API_KEYS || '')
+  .split(',')
+  .map(k => k.trim())
+  .filter(k => k.length > 0);
+
+let nvidiaKeyIndex = 0;
+
+function getNextNvidiaKey() {
+  if (NVIDIA_KEYS.length === 0) return null;
+  const key = NVIDIA_KEYS[nvidiaKeyIndex % NVIDIA_KEYS.length];
+  nvidiaKeyIndex++;
+  return key;
+}
+
 const MODAL_BASE_URL = process.env.MODAL_BASE_URL || 'https://api.us-west-2.modal.direct/v1';
 
 // Gemini (apenas para visão, não usado no atendente)
@@ -1933,9 +1949,9 @@ async function getAgentResponse(messages, whatsapp, name) {
     ];
     
     // PRINCIPAL: Nvidia API direta
-    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    const nvidiaKey = getNextNvidiaKey();
     if (nvidiaKey) {
-      console.log(`🎮 Usando Nvidia Qwen 3.5 397B (API direta)...`);
+      console.log(`🎮 Usando Nvidia Qwen 3.5 397B (chave ${nvidiaKeyIndex}/${NVIDIA_KEYS.length})...`);
       
       try {
         const nvidiaResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {

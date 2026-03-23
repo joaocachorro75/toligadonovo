@@ -1964,9 +1964,9 @@ async function getAgentResponse(messages, whatsapp, name) {
       console.log('⚠️ NVIDIA_API_KEY não configurada');
     }
     
-    // FALLBACK: Modal
+    // FALLBACK: Modal com GLM-5
     const modalKey = getNextModalKey();
-    console.log(`📦 Nvidia falhou - usando Modal (fallback)...`);
+    console.log(`📦 Nvidia falhou - usando Modal GLM-5 (fallback)...`);
     
     const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -1975,7 +1975,7 @@ async function getAgentResponse(messages, whatsapp, name) {
         'Authorization': `Bearer ${modalKey}`
       },
       body: JSON.stringify({
-        model: 'qwen/qwen3.5-397b-a17b',
+        model: 'zai-org/GLM-5-FP8',
         messages: formattedMessages,
         temperature: 0.9,
         max_tokens: 500
@@ -1987,7 +1987,7 @@ async function getAgentResponse(messages, whatsapp, name) {
     const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
     
     if (responseText) {
-      console.log('✅ Modal respondeu!');
+      console.log('✅ Modal GLM-5 respondeu!');
       return responseText;
     }
     

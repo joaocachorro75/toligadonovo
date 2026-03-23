@@ -1914,7 +1914,7 @@ async function saveMessage(whatsapp, role, content, name = null, interest = null
   }
 }
 
-// Função principal - Groq como principal, Modal (Nvidia Qwen) como fallback
+// Função principal - Nvidia API (principal) + Modal (fallback)
 async function getAgentResponse(messages, whatsapp, name) {
   // Construir contexto com preços dinâmicos do banco
   let contextPrompt = await getAgentSystemPrompt();
@@ -1932,70 +1932,66 @@ async function getAgentResponse(messages, whatsapp, name) {
       }))
     ];
     
-    // PRINCIPAL: Usar Nvidia Qwen via Modal
-    const apiKey = getNextModalKey();
-    console.log(`🎮 Usando Nvidia Qwen 3.5 397B (principal)...`);
-    
-    try {
-      const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'qwen/qwen3.5-397b-a17b',
-          messages: formattedMessages,
-          temperature: 0.9,
-          max_tokens: 500
-        })
-      });
-      
-      const data = await response.json();
-      
-      // Qwen pode retornar content ou reasoning_content
-      const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
-      
-      if (responseText) {
-        console.log('✅ Nvidia Qwen respondeu!');
-        return responseText;
-      }
-      
-      console.error('Nvidia falhou:', JSON.stringify(data).substring(0, 200));
-    } catch (e) {
-      console.error('Nvidia falhou:', e.message);
-    }
-    
-    // FALLBACK: Usar Groq se Nvidia falhar
-    const groqKey = process.env.GROQ_API_KEY;
-    if (groqKey) {
-      console.log(`⚡ Nvidia falhou - usando Groq Llama 3.3 70B (fallback)...`);
+    // PRINCIPAL: Nvidia API direta
+    const nvidiaKey = process.env.NVIDIA_API_KEY;
+    if (nvidiaKey) {
+      console.log(`🎮 Usando Nvidia Qwen 3.5 397B (API direta)...`);
       
       try {
-        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const nvidiaResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${groqKey}`
+            'Authorization': `Bearer ${nvidiaKey}`
           },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'qwen/qwen3.5-397b-a17b',
             messages: formattedMessages,
             temperature: 0.9,
             max_tokens: 500
           })
         });
         
-        const groqData = await groqResponse.json();
-        if (groqData.choices?.[0]?.message?.content) {
-          console.log('✅ Groq respondeu!');
-          return groqData.choices[0].message.content;
+        const nvidiaData = await nvidiaResponse.json();
+        if (nvidiaData.choices?.[0]?.message?.content) {
+          console.log('✅ Nvidia respondeu!');
+          return nvidiaData.choices[0].message.content;
         }
       } catch (e) {
-        console.error('Groq também falhou:', e.message);
+        console.error('Nvidia falhou:', e.message);
       }
+    } else {
+      console.log('⚠️ NVIDIA_API_KEY não configurada');
     }
     
+    // FALLBACK: Modal
+    const modalKey = getNextModalKey();
+    console.log(`📦 Nvidia falhou - usando Modal (fallback)...`);
+    
+    const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${modalKey}`
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen3.5-397b-a17b',
+        messages: formattedMessages,
+        temperature: 0.9,
+        max_tokens: 500
+      })
+    });
+    
+    const data = await response.json();
+    
+    const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
+    
+    if (responseText) {
+      console.log('✅ Modal respondeu!');
+      return responseText;
+    }
+    
+    console.error('Modal também falhou:', JSON.stringify(data).substring(0, 200));
     return null;
   } catch (e) {
     console.error('Erro no agente:', e.message);

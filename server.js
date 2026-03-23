@@ -1932,10 +1932,44 @@ async function getAgentResponse(messages, whatsapp, name) {
       }))
     ];
     
-    // PRINCIPAL: Usar Groq
+    // PRINCIPAL: Usar Nvidia Qwen via Modal
+    const apiKey = getNextModalKey();
+    console.log(`🎮 Usando Nvidia Qwen 3.5 397B (principal)...`);
+    
+    try {
+      const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'qwen/qwen3.5-397b-a17b',
+          messages: formattedMessages,
+          temperature: 0.9,
+          max_tokens: 500
+        })
+      });
+      
+      const data = await response.json();
+      
+      // Qwen pode retornar content ou reasoning_content
+      const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
+      
+      if (responseText) {
+        console.log('✅ Nvidia Qwen respondeu!');
+        return responseText;
+      }
+      
+      console.error('Nvidia falhou:', JSON.stringify(data).substring(0, 200));
+    } catch (e) {
+      console.error('Nvidia falhou:', e.message);
+    }
+    
+    // FALLBACK: Usar Groq se Nvidia falhar
     const groqKey = process.env.GROQ_API_KEY;
     if (groqKey) {
-      console.log(`⚡ Usando Groq Llama 3.3 70B (principal)...`);
+      console.log(`⚡ Nvidia falhou - usando Groq Llama 3.3 70B (fallback)...`);
       
       try {
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1958,39 +1992,10 @@ async function getAgentResponse(messages, whatsapp, name) {
           return groqData.choices[0].message.content;
         }
       } catch (e) {
-        console.error('Groq falhou:', e.message);
+        console.error('Groq também falhou:', e.message);
       }
     }
     
-    // FALLBACK: Usar Modal (Nvidia Qwen) se Groq falhar
-    const apiKey = getNextModalKey();
-    console.log(`🎮 Groq falhou - usando Modal Nvidia Qwen 3.5 397B (fallback)...`);
-    
-    const response = await fetch(`${MODAL_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.5-397b-a17b',
-        messages: formattedMessages,
-        temperature: 0.9,
-        max_tokens: 500
-      })
-    });
-    
-    const data = await response.json();
-    
-    // Qwen pode retornar content ou reasoning_content
-    const responseText = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning_content;
-    
-    if (responseText) {
-      console.log('✅ Nvidia Qwen respondeu!');
-      return responseText;
-    }
-    
-    console.error('Modal também falhou:', JSON.stringify(data).substring(0, 200));
     return null;
   } catch (e) {
     console.error('Erro no agente:', e.message);

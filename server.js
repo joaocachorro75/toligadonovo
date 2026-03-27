@@ -216,9 +216,9 @@ const INITIAL_DATA = {
     },
     evolution: {
         enabled: true,
-        baseUrl: 'https://automacao-evolution-api.nfeujb.easypanel.host',
+        baseUrl: 'https://to-ligado-evolution-api.m6tens.easypanel.host',
         instanceName: 'toligado',
-        apiKey: '5BE128D18942-4B09-8AF8-454ADEEB06B1',
+        apiKey: 'A2EF98C4D3DA-47E9-97B7-8398A7DDA8DC',
         welcomeMessage: 'Olá! Recebemos seu pedido de *{produto}*.',
         reminderMessage: 'Olá *{cliente}*! Lembrete de renovação.'
     }
